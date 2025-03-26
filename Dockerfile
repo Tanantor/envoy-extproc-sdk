@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.2
 FROM python:3.9-slim AS base
 
 SHELL ["/bin/bash", "-c"]
@@ -47,6 +46,7 @@ RUN --mount=type=cache,target=/root/.cache \
         --no-install-workspace
 
 # Copy source code and generated protobuf files
+COPY . .
 COPY ./envoy_extproc_sdk ./envoy_extproc_sdk
 COPY generated/python/standardproto/ ./
 
