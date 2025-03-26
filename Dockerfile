@@ -57,6 +57,9 @@ RUN --mount=type=cache,target=/root/.cache \
         --no-dev \
         --no-editable
 
+# Install generated code into site-packages
+RUN bash ./scripts/install_generated_code.sh
+
 FROM base AS final
 
 ENV PYTHONUNBUFFERED=1 \
