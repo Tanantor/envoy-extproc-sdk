@@ -82,7 +82,9 @@ COPY ./examples ./examples
 
 ### Testing
 
-There are also some testing utilities in `envoy_extproc_sdk.testing`. These mainly help create and send payloads to a processor for unit testing. 
+#### Unit Testing
+
+There are some testing utilities in `envoy_extproc_sdk.testing`. These mainly help create and send payloads to a processor for unit testing. 
 * `envoy_headers`: return a [HttpHeaders](https://github.com/envoyproxy/envoy/blob/1cf5603dc5239c92e5bc38ef321f59ccf6eabc6e/api/envoy/service/ext_proc/v3/external_processor.proto#L180) object from a `dict` of headers or a `list` of key-value pairs
 * `envoy_body`: return a [HttpBody](https://github.com/envoyproxy/envoy/blob/1cf5603dc5239c92e5bc38ef321f59ccf6eabc6e/api/envoy/service/ext_proc/v3/external_processor.proto#L199) object from several types that could be bodies
 * `envoy_set_headers_to_dict`: return a `dict` of headers from a [CommonResponse](https://github.com/envoyproxy/envoy/blob/1cf5603dc5239c92e5bc38ef321f59ccf6eabc6e/api/envoy/service/ext_proc/v3/external_processor.proto#L230) object (useful for response modification assertions)
@@ -92,6 +94,32 @@ P = BaseExtProcService()
 E = AsEnvoyExtProc(request_headers=headers, request_body=body)
 async for response in P.Process(E, None):
     ... # parse ProcessResponse and execute assertions based on phase
+```
+
+#### Integration Testing
+
+The project includes integration tests to validate the example services through an Envoy proxy. These tests use `httpx` as an async HTTP client to make requests to the Envoy proxy, which in turn sends the requests through the external processor services.
+
+To run the integration tests:
+
+1. Start the Docker Compose services in detached mode:
+   ```
+   make up-test
+   ```
+
+2. Run the integration tests:
+   ```
+   make integration-test-local
+   ```
+
+3. Clean up the Docker Compose services:
+   ```
+   make down-test
+   ```
+
+Or run all tests (unit and integration) with a single command:
+```
+make test
 ```
 
 ### Envoy Configuration

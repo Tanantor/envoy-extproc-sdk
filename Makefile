@@ -50,12 +50,13 @@ check-format:
 .PHONY: unit-test
 unit-test: 
 	DD_TRACE_ENABLED=false \
-		uv run python -m pytest -v tests/unit
+		uv run pytest -v tests/unit
 
 .PHONY: integration-test
-integration-test: 
+integration-test: up-test
+	sleep 5
 	DD_TRACE_ENABLED=false \
-		uv run python -m pytest tests/integration
+		uv run pytest -v tests/integration
 
 .PHONY: coverage
 coverage: 
@@ -86,6 +87,27 @@ up: build-base
 .PHONY: down
 down:
 	docker compose down --volumes
+
+.PHONY: up-test
+up-test: build-base
+	docker compose up --build -d
+
+.PHONY: down-test
+down-test:
+	docker compose down --volumes
+
+.PHONY: integration-test-local
+integration-test-local: 
+	DD_TRACE_ENABLED=false \
+		uv run pytest -v tests/integration
+
+.PHONY: test
+test: unit-test integration-test down-test
+
+.PHONY: test-flake-finder
+test-flake-finder:
+	@uv run pytest tests/unit --flake-finder
+	@uv run pytest tests/integration --flake-finder
 
 .PHONY: package
 package:
