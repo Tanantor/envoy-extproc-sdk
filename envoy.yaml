@@ -24,6 +24,22 @@ static_resources:
                             envoy.filters.http.ext_proc:
                               '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
                               disabled: true
+                        # - match:
+                        #     prefix: "/body-modify"
+                        #   route:
+                        #     cluster: upstream
+                        #   typed_per_filter_config:
+                        #     envoy.filters.http.ext_proc:
+                        #       '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        #       config:
+                        #         grpc_service:
+                        #           envoy_grpc:
+                        #             cluster_name: body_modify
+                        #         processing_mode:
+                        #           request_header_mode: SEND
+                        #           response_header_mode: SEND
+                        #           request_body_mode: BUFFERED
+                        #           response_body_mode: BUFFERED
                         - match:
                             prefix: "/"
                           route:
@@ -53,6 +69,22 @@ static_resources:
                           cluster_name: timer
                         timeout: 30s
                       failure_mode_allow: true
+                      message_timeout: 0.2s
+                      processing_mode: 
+                        request_header_mode: SEND
+                        response_header_mode: SEND
+                        request_body_mode: BUFFERED
+                        response_body_mode: BUFFERED
+                        request_trailer_mode: SKIP
+                        response_trailer_mode: SKIP
+                  - name: envoy.filters.http.ext_proc
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+                      grpc_service: 
+                        envoy_grpc:
+                          cluster_name: body_modify
+                        timeout: 30s
+                      failure_mode_allow: false
                       message_timeout: 0.2s
                       processing_mode: 
                         request_header_mode: SEND
@@ -281,6 +313,26 @@ static_resources:
                 address: context
                 port_value: 50051
             hostname: context
+    type: LOGICAL_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+
+  - name: body_modify
+    dns_lookup_family: V4_ONLY
+    lb_policy: LEAST_REQUEST
+    load_assignment:
+      cluster_name: body_modify
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: body_modify
+                port_value: 50051
+            hostname: body_modify
     type: LOGICAL_DNS
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:

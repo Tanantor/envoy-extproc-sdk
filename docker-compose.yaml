@@ -135,3 +135,21 @@ services:
       - --logging
       - --service
       - examples.CtxExtProcService
+
+  body_modify:
+    hostname: body_modify
+    image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
+    ports:
+      - "50057:50051"
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DD_TRACE_ENABLED=false
+    command:
+      - --logging
+      - --service
+      - examples.BodyModifyExtProcService

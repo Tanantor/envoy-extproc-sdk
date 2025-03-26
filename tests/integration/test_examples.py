@@ -1,7 +1,6 @@
 import pytest
 import json
 from httpx import AsyncClient
-    
 
 
 @pytest.mark.asyncio
@@ -44,6 +43,7 @@ async def test_timer_service(http_client: AsyncClient, request_id: str):
 @pytest.mark.asyncio
 async def test_echo_service(http_client: AsyncClient, request_id: str):
     """Test that the EchoExtProcService echoes back when requested."""
+    # TODO: CHeck this raises StopRequestProcessing exception in logs
     test_data = {"test": "data"}
 
     # Without echo-only header, should reach the upstream
@@ -131,3 +131,56 @@ async def test_context_service(http_client: AsyncClient, request_id: str):
     # Verify the context was passed correctly
     assert "x-context-id" in body["headers"]
     assert body["headers"]["x-context-id"] == context_id
+
+
+@pytest.mark.asyncio
+async def test_body_modify_service(http_client: AsyncClient, request_id: str):
+    """Test that the BodyModifyExtProcService correctly modifies the JSON request body."""
+    test_data = {
+        "user_id": "12345",
+        "name": "test-user",
+        "other_field": "unchanged"
+    }
+
+    response = await http_client.post(
+        f"/body-modify?id={request_id}",
+        json=test_data,
+        headers={"content-type": "application/json"}
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["path"].startswith("/body-modify")
+
+    # The x-body-modified header should be present in the response headers
+    assert "x-body-modified" in response.headers
+    assert response.headers["x-body-modified"] == "true"
+
+    # Check that the headers were also added to the upstream request
+    assert "x-body-modified" in body["headers"]
+    assert body["headers"]["x-body-modified"] == "true"
+
+    # The body received by the echo server should have the modifications we made
+    # The echo server should return the modified body back to us in its "body" field
+    received_body = body["body"]
+    print("received_body", received_body)
+
+    if isinstance(received_body, str):
+        try:
+            received_body = json.loads(received_body)
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse JSON body: {e}")
+            assert False, f"Failed to parse JSON body: {e}, raw body: {received_body}"
+
+    # Check that the key was renamed from user_id to userId
+    assert "userId" in received_body
+    assert "user_id" not in received_body
+    assert received_body["userId"] == "12345"
+
+    # Check that the name was modified with a prefix
+    assert received_body["name"].startswith("modified-")
+    assert received_body["name"] == "modified-test-user"
+
+    # Check that other fields were unchanged
+    assert received_body["other_field"] == "unchanged"
