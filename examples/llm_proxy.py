@@ -26,7 +26,7 @@ MODEL_ROUTES = {
     "gpt-4o": "openai",
     "claude-3.5-sonnet": "anthropic",
     "claude-3.7-sonnet": "anthropic",
-    "default": "default",
+    "default": "default_llm_provider",
 }
 
 logger = logging.getLogger(__name__)
@@ -99,12 +99,15 @@ class LLMProxyExtProcService(BaseExtProcService):
                         original_model, MODEL_ROUTES["default"]
                     )
                     self.add_header(response, ROUTE_HEADER, target_route)
+                    # Clear the route cache for the current client request. 
+                    # We modified headers that are used to calculate the route.
+                    response.clear_route_cache = True
 
                     # Modify model parameter based on target route
                     if target_route == "openai":
                         json_body["model"] = "gpt-4o"
                     elif target_route == "anthropic":
-                        json_body["model"] = "claude-3.5-sonnet"
+                        json_body["model"] = "claude-3.7-sonnet"
 
                     modified = True
                     logger.info(

@@ -1,5 +1,4 @@
 services:
-
   envoy:
     image: envoyproxy/envoy:${ENVOY_VERSION:-v1.22-latest}
     ports:
@@ -8,8 +7,8 @@ services:
     volumes:
       - ./envoy.yaml:/etc/envoy/envoy.yaml
     # turn on logging as needed; can be noisy otherwise
-    logging:
-      driver: none
+    # logging:
+    #   driver: none
 
   upstream:
     hostname: upstream
@@ -21,7 +20,7 @@ services:
       - "8000:80"
     environment:
       - LOG_LEVEL=info
-      
+
   streaming:
     hostname: streaming
     image: streaming-server:${IMAGE_TAG:-compose}
@@ -30,6 +29,30 @@ services:
       dockerfile: "Dockerfile"
     ports:
       - "8001:80"
+
+  openai:
+    hostname: openai
+    image: streaming-server:${IMAGE_TAG:-compose}
+    build:
+      context: tests/mocks/streaming
+      dockerfile: "Dockerfile"
+    ports:
+      - "8002:80"
+    environment:
+      - PROVIDER=openai
+      - LOG_LEVEL=debug
+
+  anthropic:
+    hostname: anthropic
+    image: streaming-server:${IMAGE_TAG:-compose}
+    build:
+      context: tests/mocks/streaming
+      dockerfile: "Dockerfile"
+    ports:
+      - "8003:80"
+    environment:
+      - PROVIDER=anthropic
+      - LOG_LEVEL=debug
 
   base:
     image: envoy-extproc-sdk:${IMAGE_TAG:-compose}
@@ -162,7 +185,7 @@ services:
       - --logging
       - --service
       - examples.BodyModifyExtProcService
-      
+
   llm_proxy:
     hostname: llm_proxy
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}

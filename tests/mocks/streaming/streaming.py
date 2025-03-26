@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 """
 Simple HTTP server that simulates a streaming LLM API response.
+
+This server can simulate different LLM providers (OpenAI, Anthropic) based on
+the PROVIDER environment variable. It includes provider information in the
+response chunks to demonstrate header-based routing in Envoy.
 """
 
 import http.server
 import json
+import os
 import socketserver
 import time
 from http import HTTPStatus
@@ -14,6 +19,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 PORT = 80
+PROVIDER = os.environ.get("PROVIDER", "default")
 
 
 class StreamingHandler(http.server.BaseHTTPRequestHandler):
@@ -120,17 +126,21 @@ class StreamingHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.flush()
                 time.sleep(0.1)
 
-                # Send a few content chunks
+                # Send a few content chunks with provider information
+                provider_msg = f"Response from {PROVIDER} provider. "
+                
                 for i in range(3):
+                    content = f"part {i + 1} " + (provider_msg if i == 0 else "")
                     chunk_data = json.dumps(
                         {
                             "id": "chatcmpl-123",
                             "object": "chat.completion.chunk",
                             "model": model,
+                            "provider": PROVIDER,
                             "choices": [
                                 {
                                     "index": 0,
-                                    "delta": {"content": f"part {i + 1} "},
+                                    "delta": {"content": content},
                                     "finish_reason": None,
                                 }
                             ],

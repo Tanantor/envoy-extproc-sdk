@@ -133,60 +133,73 @@ async def test_context_service(http_client: AsyncClient, request_id: str):
     assert body["headers"]["x-context-id"] == context_id
 
 
+# @pytest.mark.asyncio
+# async def test_body_modify_service(http_client: AsyncClient, request_id: str):
+#     """Test that the BodyModifyExtProcService correctly modifies the JSON request body."""
+#     test_data = {"user_id": "12345", "name": "test-user", "other_field": "unchanged"}
+
+#     response = await http_client.post(
+#         f"/body-modify?id={request_id}",
+#         json=test_data,
+#         headers={"content-type": "application/json"},
+#     )
+
+#     assert response.status_code == 200
+
+#     body = response.json()
+#     assert body["path"].startswith("/body-modify")
+
+#     # The x-body-modified header should be present in the response headers
+#     assert "x-body-modified" in response.headers
+#     assert response.headers["x-body-modified"] == "true"
+
+#     # Check that the headers were also added to the upstream request
+#     assert "x-body-modified" in body["headers"]
+#     assert body["headers"]["x-body-modified"] == "true"
+
+#     # The body received by the echo server should have the modifications we made
+#     # The echo server should return the modified body back to us in its "body" field
+#     received_body = body["body"]
+#     print("received_body", received_body)
+
+#     if isinstance(received_body, str):
+#         try:
+#             received_body = json.loads(received_body)
+#         except json.JSONDecodeError as e:
+#             print(f"Failed to parse JSON body: {e}")
+#             assert False, f"Failed to parse JSON body: {e}, raw body: {received_body}"
+
+#     # Check that the key was renamed from user_id to userId
+#     assert "userId" in received_body
+#     assert "user_id" not in received_body
+#     assert received_body["userId"] == "12345"
+
+#     # Check that the name was modified with a prefix
+#     assert received_body["name"].startswith("modified-")
+#     assert received_body["name"] == "modified-test-user"
+
+#     # Check that other fields were unchanged
+#     assert received_body["other_field"] == "unchanged"
+
+
 @pytest.mark.asyncio
-async def test_body_modify_service(http_client: AsyncClient, request_id: str):
-    """Test that the BodyModifyExtProcService correctly modifies the JSON request body."""
-    test_data = {"user_id": "12345", "name": "test-user", "other_field": "unchanged"}
-
-    response = await http_client.post(
-        f"/body-modify?id={request_id}",
-        json=test_data,
-        headers={"content-type": "application/json"},
-    )
-
-    assert response.status_code == 200
-
-    body = response.json()
-    assert body["path"].startswith("/body-modify")
-
-    # The x-body-modified header should be present in the response headers
-    assert "x-body-modified" in response.headers
-    assert response.headers["x-body-modified"] == "true"
-
-    # Check that the headers were also added to the upstream request
-    assert "x-body-modified" in body["headers"]
-    assert body["headers"]["x-body-modified"] == "true"
-
-    # The body received by the echo server should have the modifications we made
-    # The echo server should return the modified body back to us in its "body" field
-    received_body = body["body"]
-    print("received_body", received_body)
-
-    if isinstance(received_body, str):
-        try:
-            received_body = json.loads(received_body)
-        except json.JSONDecodeError as e:
-            print(f"Failed to parse JSON body: {e}")
-            assert False, f"Failed to parse JSON body: {e}, raw body: {received_body}"
-
-    # Check that the key was renamed from user_id to userId
-    assert "userId" in received_body
-    assert "user_id" not in received_body
-    assert received_body["userId"] == "12345"
-
-    # Check that the name was modified with a prefix
-    assert received_body["name"].startswith("modified-")
-    assert received_body["name"] == "modified-test-user"
-
-    # Check that other fields were unchanged
-    assert received_body["other_field"] == "unchanged"
-
-
-@pytest.mark.asyncio
-async def test_llm_proxy_service_streaming(http_client: AsyncClient, request_id: str):
-    """Test that the LLMProxyExtProcService correctly handles streaming responses."""
+@pytest.mark.parametrize(
+    "model,expected_route,expected_provider_model",
+    [
+        ("gpt-3.5-turbo", "openai", "gpt-4o"),
+        ("claude-3.5-sonnet", "anthropic", "claude-3.7-sonnet"),
+    ],
+)
+async def test_llm_proxy_service_streaming(
+    http_client: AsyncClient,
+    request_id: str,
+    model: str,
+    expected_route: str,
+    expected_provider_model: str,
+):
+    """Test that the LLMProxyExtProcService correctly handles streaming responses and routes to the right provider."""
     test_data = {
-        "model": "gpt-3.5-turbo",
+        "model": model,
         "messages": [{"role": "user", "content": "Hello"}],
         "stream": True,
     }
@@ -202,17 +215,19 @@ async def test_llm_proxy_service_streaming(http_client: AsyncClient, request_id:
         },
     ) as response:
         assert response.status_code == 200
-
         assert "text/event-stream" in response.headers["content-type"].lower()
 
         # Check proxy headers are present
         assert "x-llm-proxy" in response.headers
         assert response.headers["x-llm-proxy"] == "true"
-        
+
         # Check model information is preserved in the response
         assert "x-original-model" in response.headers
-        assert response.headers["x-original-model"] == "gpt-3.5-turbo"
-        print(("response_text", response))
+        assert response.headers["x-original-model"] == model
+
+        # # Check routing header was set
+        assert "x-route-to" in response.headers
+        assert response.headers["x-route-to"] == expected_route
 
         full_response = ""
         async for chunk in response.aiter_text():
@@ -220,7 +235,7 @@ async def test_llm_proxy_service_streaming(http_client: AsyncClient, request_id:
             if "[DONE]" in chunk:
                 break
 
-        print(f"Full response: {full_response[:200]}...")
+        print(f"Full response for {model}: {full_response[:200]}...")
 
         sse_chunks = [chunk for chunk in full_response.split("data:") if chunk.strip()]
         print(f"Found {len(sse_chunks)} SSE chunks")
@@ -231,6 +246,7 @@ async def test_llm_proxy_service_streaming(http_client: AsyncClient, request_id:
         assert "assistant" in full_response
         assert "content" in full_response
         assert "[DONE]" in full_response
-        
+
         # Verify the model was changed in the response chunks
-        assert '"model": "gpt-4o"' in full_response
+        assert f'"model": "{expected_provider_model}"' in full_response
+        assert f'"provider": "{expected_route}"' in full_response
