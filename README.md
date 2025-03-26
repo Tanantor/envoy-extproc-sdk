@@ -330,7 +330,18 @@ will run our first example, the "trivial" processor.
 
 * `examples.DecoratedExtProcService`: This example copies `DigestExtProcService`, but implements the service using the `@process` decorator instead of as a subclass service. 
 
-* `examples.EchoExtProcService`: This example demonstrates use of `StopRequestProcessing` to respond immediately from an ExternalProcessor, instead of sending a request to the upstream processors or target. 
+* `examples.EchoExtProcService`: This example demonstrates use of `StopRequestProcessing` to respond immediately from an ExternalProcessor, instead of sending a request to the upstream processors or target.
+
+* `examples.BodyModifyExtProcService`: This example demonstrates how to modify the JSON request body before forwarding to the upstream service. It renames a key, modifies a value, and adds headers to indicate the body was modified.
+
+* `examples.LLMProxyExtProcService`: This example demonstrates how to proxy requests to an LLM API by modifying request parameters and headers. It specifically handles streaming responses from LLM providers and shows how to implement an API proxy for model providers like OpenAI. To test this service with curl:
+
+```bash
+curl -v "http://localhost:8080/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer test-key" \
+  -d '{"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": "Hello"}], "stream": true}'
+```
 
 * `CtxExtProcService`: This example allows for testing the request context. It reads a request header `x-context-id`, adding that to the upstream request headers. If that header is missing, the service does nothing else. If it exists, it will also analyze the request body, which it expects to be exactly the `x-context-id` supplied. The processor will fail if this doesn't match. The filter also processes the response body, which it expects to be JSON with the request path equal to `path` (as with our echo server in `tests/mocks/echo`). The service checks that value matches the `path` stored in the request context. These steps are largely to check that we can _concurrently_ make requests with different values and see consistency in the response header `x-context-id`, which we will not get if the service's processing fails. 
 
