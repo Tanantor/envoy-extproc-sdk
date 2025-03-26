@@ -2,6 +2,7 @@ import http.server
 import json
 import logging
 from os import environ
+from typing import Any, Dict
 import socketserver
 from urllib.parse import parse_qs
 
@@ -16,11 +17,23 @@ logger = logging.getLogger(__name__)
 
 class H(Handler):
     protocol_version = "HTTP/1.0"
-    rsp = {"method": None, "path": None, "headers": {}, "body": "", "message": ECHO_MESSAGE}
+    rsp: Dict[str, Any] = {
+        "method": None,
+        "path": None,
+        "headers": {},
+        "body": "",
+        "message": ECHO_MESSAGE,
+    }
 
     def write_response(self):
         # Reset response for each new request to avoid state bleeding between requests
-        self.rsp = {"method": None, "path": None, "headers": {}, "body": "", "message": ECHO_MESSAGE}
+        self.rsp = {
+            "method": None,
+            "path": None,
+            "headers": {},
+            "body": "",
+            "message": ECHO_MESSAGE,
+        }
         self.rsp["method"] = self.command.lower()
         if self.path.startswith("/redirect"):
             self.send_response(308)
@@ -35,14 +48,14 @@ class H(Handler):
         # Check if we're getting chunked encoding
         transfer_encoding = self.headers.get("Transfer-Encoding", "")
         is_chunked = "chunked" in transfer_encoding.lower()
-        
+
         content_length = int(
             self.headers.get(
                 "Content-Length", self.headers.get("x-content-length", "0")
             )
         )
         logger.debug(f"content_length: {content_length}, chunked: {is_chunked}")
-        
+
         if is_chunked:
             # Handle chunked encoding
             data = b""
@@ -50,34 +63,34 @@ class H(Handler):
                 # Read the chunk size line
                 chunk_size_line = self.rfile.readline().strip()
                 logger.debug(f"chunk_size_line: {chunk_size_line}")
-                
+
                 # If empty, we're done
                 if not chunk_size_line:
                     break
-                    
+
                 # Parse the chunk size (hex number)
                 try:
                     chunk_size = int(chunk_size_line, 16)
                 except ValueError:
                     logger.error(f"Invalid chunk size: {chunk_size_line}")
                     break
-                    
+
                 # If chunk size is 0, we're done
                 if chunk_size == 0:
                     # Read the final CRLF
                     self.rfile.readline()
                     break
-                    
+
                 # Read the chunk data
                 chunk_data = self.rfile.read(chunk_size)
                 data += chunk_data
-                
+
                 # Read the CRLF at the end of the chunk
                 self.rfile.readline()
-            
-            self.rsp["body"] = data.decode('utf-8')
+
+            self.rsp["body"] = data.decode("utf-8")
             logger.debug(f"Assembled chunked body: {self.rsp['body']}")
-            
+
         elif content_length > 0:
             # Standard content-length approach
             self.rsp["body"] = self.rfile.read(content_length).decode()

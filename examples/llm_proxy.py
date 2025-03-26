@@ -17,6 +17,17 @@ from grpc import ServicerContext
 
 LLM_PROXY_HEADER = "x-llm-proxy"
 TARGET_ENDPOINT = "/completions"
+TARGET_MODEL_HEADER = "x-target-model"
+ROUTE_HEADER = "x-route-to"
+
+# Model to destination mapping
+MODEL_ROUTES = {
+    "gpt-3.5-turbo": "openai",
+    "gpt-4o": "openai",
+    "claude-3.5-sonnet": "anthropic",
+    "claude-3.7-sonnet": "anthropic",
+    "default": "default",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -71,20 +82,40 @@ class LLMProxyExtProcService(BaseExtProcService):
         ):
             try:
                 body_str = body.body.decode("utf-8")
+                logger.debug(f"ORIGINAL BODY: {body_str}")
                 json_body = json.loads(body_str)
 
                 # Track modifications
                 modified = False
 
-                # Modify the 'model' parameter if present
+                # Extract and process the 'model' parameter if present
                 if "model" in json_body:
                     original_model = json_body["model"]
-                    json_body["model"] = "gpt-4o"
+                    request["original_model"] = original_model
+
+                    # Set routing headers based on the model
+                    self.add_header(response, TARGET_MODEL_HEADER, original_model)
+                    target_route = MODEL_ROUTES.get(
+                        original_model, MODEL_ROUTES["default"]
+                    )
+                    self.add_header(response, ROUTE_HEADER, target_route)
+
+                    # Modify model parameter based on target route
+                    if target_route == "openai":
+                        json_body["model"] = "gpt-4o"
+                    elif target_route == "anthropic":
+                        json_body["model"] = "claude-3.5-sonnet"
+
                     modified = True
-                    logger.debug(f"Changed model from {original_model} to gpt-4o")
+                    logger.info(
+                        f"Routing {original_model} to {target_route} as {json_body['model']}"
+                    )
 
                 if modified:
                     new_body = json.dumps(json_body).encode("utf-8")
+                    
+                    # Print the modified body for debugging
+                    logger.debug(f"MODIFIED BODY SENT: {new_body.decode('utf-8')}")
 
                     response.body_mutation.body = new_body
 
@@ -110,6 +141,10 @@ class LLMProxyExtProcService(BaseExtProcService):
 
         # Add proxy header to response
         self.add_header(response, LLM_PROXY_HEADER, "true")
+
+        # Add model information to response if available
+        if "original_model" in request:
+            self.add_header(response, "x-original-model", request["original_model"])
 
         # Check if this is a streaming response
         content_type = self.get_header(headers, "content-type")

@@ -205,8 +205,13 @@ async def test_llm_proxy_service_streaming(http_client: AsyncClient, request_id:
 
         assert "text/event-stream" in response.headers["content-type"].lower()
 
+        # Check proxy headers are present
         assert "x-llm-proxy" in response.headers
         assert response.headers["x-llm-proxy"] == "true"
+        
+        # Check model information is preserved in the response
+        assert "x-original-model" in response.headers
+        assert response.headers["x-original-model"] == "gpt-3.5-turbo"
         print(("response_text", response))
 
         full_response = ""
@@ -226,3 +231,6 @@ async def test_llm_proxy_service_streaming(http_client: AsyncClient, request_id:
         assert "assistant" in full_response
         assert "content" in full_response
         assert "[DONE]" in full_response
+        
+        # Verify the model was changed in the response chunks
+        assert '"model": "gpt-4o"' in full_response
