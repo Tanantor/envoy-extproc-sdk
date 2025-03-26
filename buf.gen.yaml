@@ -5,6 +5,8 @@ plugins:
     strategy: all
   - remote: buf.build/grpc/python:v1.71.0
     out: generated/python/standardproto
+  - remote: buf.build/protocolbuffers/pyi:v30.1
+    out: generated/python/standardproto
   # - local: protoc-gen-grpclib_python
   #   out: generated/python/grpclib
   #   strategy: all
