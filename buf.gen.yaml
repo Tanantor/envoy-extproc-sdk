@@ -3,9 +3,8 @@ plugins:
   - protoc_builtin: python
     out: generated/python/standardproto
     strategy: all
-  - local: /usr/local/bin/grpc_python_plugin
+  - remote: buf.build/grpc/python:v1.71.0
     out: generated/python/standardproto
-    strategy: all
   # - local: protoc-gen-grpclib_python
   #   out: generated/python/grpclib
   #   strategy: all
