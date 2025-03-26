@@ -18,7 +18,7 @@ services:
       context: tests/mocks/echo
       dockerfile: "Dockerfile"
     ports:
-      - '8000:80'
+      - "8000:80"
     environment:
       - LOG_LEVEL=info
 
@@ -29,7 +29,7 @@ services:
       dockerfile: Dockerfile
 
   trivial:
-    hostname: 'trivial'
+    hostname: "trivial"
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
     build:
       context: .
@@ -37,11 +37,11 @@ services:
       args:
         IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50051:50051'
+      - "50051:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
-    command: 
+    command:
       - --logging
       - --service
       - examples.TrivialExtProcService
@@ -49,12 +49,17 @@ services:
   timer:
     hostname: timer
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50052:50051'
+      - "50052:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
-    command: 
+    command:
       - --logging
       - --service
       - examples.TimerExtProcService
@@ -62,12 +67,17 @@ services:
   echo:
     hostname: echo
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50053:50051'
+      - "50053:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
-    command: 
+    command:
       - --logging
       - --service
       - examples.EchoExtProcService
@@ -75,8 +85,13 @@ services:
   digest:
     hostname: digest
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50054:50051'
+      - "50054:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
@@ -88,12 +103,17 @@ services:
   decorated:
     hostname: decorated
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50055:50051'
+      - "50055:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
-    command: 
+    command:
       - --logging
       - --service
       - examples.DecoratedExtProcService
@@ -101,12 +121,17 @@ services:
   context:
     hostname: context
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50056:50051'
+      - "50056:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
-    command: 
+    command:
       - --logging
       - --service
       - examples.CtxExtProcService
