@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import cast, Dict, Optional
 
 from envoy_extproc_sdk import BaseExtProcService
 from envoy_extproc_sdk.testing import AsEnvoyExtProc, envoy_body, envoy_headers
@@ -7,12 +7,62 @@ from envoy_extproc_sdk.util.envoy import (
     EnvoyHeaderValueOption,
     ext_api,
 )
+from grpc import ServicerContext
 import pytest
 
 
-class FakeServicerContext:
+# Mock ServicerContext that only implements the needed methods for tests
+class FakeServicerContext(ServicerContext):
     def abort(self, code, details):
         raise ValueError()
+
+    def abort_with_status(self, status):
+        raise ValueError()
+
+    def add_callback(self, callback):
+        pass
+
+    def auth_context(self):
+        return {}
+
+    def cancel(self):
+        pass
+
+    def invocation_metadata(self):
+        return {}
+
+    def is_active(self):
+        return True
+
+    def peer(self):
+        return ""
+
+    def peer_identities(self):
+        return []
+
+    def peer_identity_key(self):
+        return ""
+
+    def send_initial_metadata(self, initial_metadata):
+        pass
+
+    def set_code(self, code):
+        pass
+
+    def set_compression(self, compression):
+        pass
+
+    def set_details(self, details):
+        pass
+
+    def set_trailing_metadata(self, trailing_metadata):
+        pass
+
+    def time_remaining(self):
+        return 60.0
+
+    def __eq__(self, other):
+        return isinstance(other, FakeServicerContext)
 
 
 def assert_empty_header_mutation(headers: ext_api.HeaderMutation) -> None:
@@ -38,17 +88,30 @@ async def test_base_service_process() -> None:
 async def test_abort_on_unknown() -> None:
     class BadProcessingRequest:
         def WhichOneof(self, name: str) -> str:
-            self.this_is_not_in_spec = {}
             return "this_is_not_in_spec"
 
+        this_is_not_in_spec = ext_api.HttpHeaders()
+
     class BadStream:
-        async def __aiter__(self):
-            messages = [BadProcessingRequest()]
-            for msg in messages:
-                yield msg
+        def __init__(self):
+            self.messages = [BadProcessingRequest()]
+            self._index = 0
+
+        def __aiter__(self):
+            self._index = 0
+            return self
+
+        async def __anext__(self):
+            if self._index >= len(self.messages):
+                raise StopAsyncIteration
+            msg = self.messages[self._index]
+            self._index += 1
+            return msg
 
     p = BaseExtProcService()
-    responses = p.Process(BadStream(), FakeServicerContext())
+    context = FakeServicerContext()
+    responses = p.Process(BadStream(), context)
+
     with pytest.raises(ValueError):
         async for r in responses:
             print(r)
@@ -133,7 +196,7 @@ def test_get_header(
 )
 def test_get_headers(
     headers: ext_api.HttpHeaders,
-    names: List[str],
+    names: Dict[str, str],
     results: Dict[str, str],
 ) -> None:
     p = BaseExtProcService()
@@ -184,9 +247,9 @@ def test_remove_header(key: str) -> None:
 @pytest.mark.asyncio
 async def test_process_request_headers(headers: ext_api.HttpHeaders) -> None:
     p = BaseExtProcService()
-    response = ext_api.HeadersResponse()
-    response = await p.process_request_headers(headers, None, {}, response)
-    assert isinstance(response, ext_api.HeadersResponse)
+    response = ext_api.CommonResponse()
+    response = await p.process_request_headers(headers, cast(ServicerContext, None), {}, response)
+    assert isinstance(response, ext_api.CommonResponse)
 
 
 @pytest.mark.parametrize(
@@ -196,9 +259,9 @@ async def test_process_request_headers(headers: ext_api.HttpHeaders) -> None:
 @pytest.mark.asyncio
 async def test_process_response_headers(headers: ext_api.HttpHeaders) -> None:
     p = BaseExtProcService()
-    response = ext_api.HeadersResponse()
-    response = await p.process_response_headers(headers, None, {}, response)
-    assert isinstance(response, ext_api.HeadersResponse)
+    response = ext_api.CommonResponse()
+    response = await p.process_response_headers(headers, cast(ServicerContext, None), {}, response)
+    assert isinstance(response, ext_api.CommonResponse)
 
 
 @pytest.mark.parametrize(
@@ -208,9 +271,9 @@ async def test_process_response_headers(headers: ext_api.HttpHeaders) -> None:
 @pytest.mark.asyncio
 async def test_process_request_body(body: ext_api.HttpBody) -> None:
     p = BaseExtProcService()
-    response = ext_api.BodyResponse()
-    response = await p.process_request_body(body, None, {}, response)
-    assert isinstance(response, ext_api.BodyResponse)
+    response = ext_api.CommonResponse()
+    response = await p.process_request_body(body, cast(ServicerContext, None), {}, response)
+    assert isinstance(response, ext_api.CommonResponse)
 
 
 @pytest.mark.parametrize(
@@ -220,9 +283,9 @@ async def test_process_request_body(body: ext_api.HttpBody) -> None:
 @pytest.mark.asyncio
 async def test_process_response_body(body: ext_api.HttpBody) -> None:
     p = BaseExtProcService()
-    response = ext_api.BodyResponse()
-    response = await p.process_response_body(body, None, {}, response)
-    assert isinstance(response, ext_api.BodyResponse)
+    response = ext_api.CommonResponse()
+    response = await p.process_response_body(body, cast(ServicerContext, None), {}, response)
+    assert isinstance(response, ext_api.CommonResponse)
 
 
 @pytest.mark.parametrize(
@@ -232,8 +295,8 @@ async def test_process_response_body(body: ext_api.HttpBody) -> None:
 @pytest.mark.asyncio
 async def test_process_request_trailers(trailers: ext_api.HttpTrailers) -> None:
     p = BaseExtProcService()
-    response = ext_api.TrailersResponse()
-    response = await p.process_request_trailers(trailers, None, {}, response)
+    response = ext_api.TrailersResponse(header_mutation=ext_api.HeaderMutation())
+    response = await p.process_request_trailers(trailers, cast(ServicerContext, None), {}, response)
     assert isinstance(response, ext_api.TrailersResponse)
 
 
@@ -244,6 +307,8 @@ async def test_process_request_trailers(trailers: ext_api.HttpTrailers) -> None:
 @pytest.mark.asyncio
 async def test_process_response_trailers(trailers: ext_api.HttpTrailers) -> None:
     p = BaseExtProcService()
-    response = ext_api.TrailersResponse()
-    response = await p.process_response_trailers(trailers, None, {}, response)
+    response = ext_api.TrailersResponse(header_mutation=ext_api.HeaderMutation())
+    response = await p.process_response_trailers(
+        trailers, cast(ServicerContext, None), {}, response
+    )
     assert isinstance(response, ext_api.TrailersResponse)

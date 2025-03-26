@@ -1,5 +1,4 @@
 services:
-
   envoy:
     image: envoyproxy/envoy:${ENVOY_VERSION:-v1.22-latest}
     ports:
@@ -8,8 +7,8 @@ services:
     volumes:
       - ./envoy.yaml:/etc/envoy/envoy.yaml
     # turn on logging as needed; can be noisy otherwise
-    logging:
-      driver: none
+    # logging:
+    #   driver: none
 
   upstream:
     hostname: upstream
@@ -18,9 +17,42 @@ services:
       context: tests/mocks/echo
       dockerfile: "Dockerfile"
     ports:
-      - '8000:80'
+      - "8000:80"
     environment:
       - LOG_LEVEL=info
+
+  streaming:
+    hostname: streaming
+    image: streaming-server:${IMAGE_TAG:-compose}
+    build:
+      context: tests/mocks/streaming
+      dockerfile: "Dockerfile"
+    ports:
+      - "8001:80"
+
+  openai:
+    hostname: openai
+    image: streaming-server:${IMAGE_TAG:-compose}
+    build:
+      context: tests/mocks/streaming
+      dockerfile: "Dockerfile"
+    ports:
+      - "8002:80"
+    environment:
+      - PROVIDER=openai
+      - LOG_LEVEL=debug
+
+  anthropic:
+    hostname: anthropic
+    image: streaming-server:${IMAGE_TAG:-compose}
+    build:
+      context: tests/mocks/streaming
+      dockerfile: "Dockerfile"
+    ports:
+      - "8003:80"
+    environment:
+      - PROVIDER=anthropic
+      - LOG_LEVEL=debug
 
   base:
     image: envoy-extproc-sdk:${IMAGE_TAG:-compose}
@@ -29,7 +61,7 @@ services:
       dockerfile: Dockerfile
 
   trivial:
-    hostname: 'trivial'
+    hostname: "trivial"
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
     build:
       context: .
@@ -37,11 +69,11 @@ services:
       args:
         IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50051:50051'
+      - "50051:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
-    command: 
+    command:
       - --logging
       - --service
       - examples.TrivialExtProcService
@@ -49,12 +81,17 @@ services:
   timer:
     hostname: timer
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50052:50051'
+      - "50052:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
-    command: 
+    command:
       - --logging
       - --service
       - examples.TimerExtProcService
@@ -62,12 +99,17 @@ services:
   echo:
     hostname: echo
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50053:50051'
+      - "50053:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
-    command: 
+    command:
       - --logging
       - --service
       - examples.EchoExtProcService
@@ -75,8 +117,13 @@ services:
   digest:
     hostname: digest
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50054:50051'
+      - "50054:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
@@ -88,12 +135,17 @@ services:
   decorated:
     hostname: decorated
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50055:50051'
+      - "50055:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
-    command: 
+    command:
       - --logging
       - --service
       - examples.DecoratedExtProcService
@@ -101,12 +153,53 @@ services:
   context:
     hostname: context
     image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
     ports:
-      - '50056:50051'
+      - "50056:50051"
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DD_TRACE_ENABLED=false
-    command: 
+    command:
       - --logging
       - --service
       - examples.CtxExtProcService
+
+  body_modify:
+    hostname: body_modify
+    image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
+    ports:
+      - "50057:50051"
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DD_TRACE_ENABLED=false
+    command:
+      - --logging
+      - --service
+      - examples.BodyModifyExtProcService
+
+  llm_proxy:
+    hostname: llm_proxy
+    image: envoy-extproc-sdk-examples:${IMAGE_TAG:-compose}
+    build:
+      context: .
+      dockerfile: examples/Dockerfile
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-compose}
+    ports:
+      - "50058:50051"
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DD_TRACE_ENABLED=false
+    command:
+      - --logging
+      - --service
+      - examples.LLMProxyExtProcService

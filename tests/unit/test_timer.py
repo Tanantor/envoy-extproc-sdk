@@ -1,3 +1,5 @@
+from typing import Any, cast, Dict
+
 from envoy_extproc_sdk import ext_api
 from envoy_extproc_sdk.testing import (
     envoy_body,
@@ -7,6 +9,7 @@ from envoy_extproc_sdk.testing import (
 from examples import TimerExtProcService
 from examples.timer import REQUEST_DURATION_HEADER, REQUEST_STARTED_HEADER
 from google.protobuf.timestamp_pb2 import Timestamp
+from grpc import ServicerContext
 import pytest
 
 
@@ -31,9 +34,10 @@ import pytest
     "body",
     (envoy_body(),),
 )
-def test_timer_flow(headers: ext_api.HttpHeaders, body: ext_api.HttpBody) -> None:
+@pytest.mark.asyncio
+async def test_timer_flow(headers: ext_api.HttpHeaders, body: ext_api.HttpBody) -> None:
 
-    request = {}
+    request: Dict[str, Any] = {}
 
     P = TimerExtProcService()
 
@@ -41,7 +45,9 @@ def test_timer_flow(headers: ext_api.HttpHeaders, body: ext_api.HttpBody) -> Non
     s.GetCurrentTime()
 
     response = ext_api.CommonResponse()
-    response = P.process_request_headers(headers, None, request, response)
+    response = await P.process_request_headers(
+        headers, cast(ServicerContext, None), request, response
+    )
     assert isinstance(response, ext_api.CommonResponse)
 
     _headers = envoy_set_headers_to_dict(response)
@@ -49,7 +55,7 @@ def test_timer_flow(headers: ext_api.HttpHeaders, body: ext_api.HttpBody) -> Non
     assert REQUEST_STARTED_HEADER in _headers
 
     response = ext_api.CommonResponse()
-    response = P.process_response_body(body, None, request, response)
+    response = await P.process_response_body(body, cast(ServicerContext, None), request, response)
     assert isinstance(response, ext_api.CommonResponse)
 
     _headers = envoy_set_headers_to_dict(response)

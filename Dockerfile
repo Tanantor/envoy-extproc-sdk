@@ -1,5 +1,4 @@
-# syntax=docker/dockerfile:1.2
-FROM python:3.9-slim
+FROM python:3.9-slim AS base
 
 SHELL ["/bin/bash", "-c"]
 
@@ -15,28 +14,63 @@ RUN GRPC_HEALTH_PROBE_VER=v0.3.1 \
     && curl ${GRPC_HEALTH_PROBE_URL} -L -s -o /bin/grpc_health_probe \
     && chmod +x /bin/grpc_health_probe
 
+FROM base AS build
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_DEFAULT_TIMEOUT=100 \
-    POETRY_HOME="/etc/poetry" \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_VERSION=1.1.13
-
-ENV POETRY_PATH="${POETRY_HOME}/bin/poetry"
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PYTHON=/opt/.venv/bin/python3.9 \
+    UV_PROJECT_ENVIRONMENT=/opt/.venv
 
 WORKDIR /envoy_extproc_sdk
 
-# https://python-poetry.org/docs/master/#installation
-RUN curl -sSL https://install.python-poetry.org | python3 -
-RUN cd /usr/local/bin && ln -s ${POETRY_PATH} && chmod +x ${POETRY_PATH}
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:0.6.8 /uv /usr/local/bin/uv
 
-COPY ./poetry.lock ./pyproject.toml ./
-RUN poetry config virtualenvs.create false && poetry install -vvv --no-dev --no-root
+RUN python -m venv /opt/.venv
+ENV PATH="/opt/.venv/bin:$PATH"
 
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync \
+        --locked \
+        --no-dev \
+        --no-install-workspace
+
+# Copy source code and generated protobuf files
+COPY . .
 COPY ./envoy_extproc_sdk ./envoy_extproc_sdk
 COPY generated/python/standardproto/ ./
+
+# Sync the project
+RUN --mount=type=cache,target=/root/.cache \
+    uv sync \
+        --locked \
+        --no-dev \
+        --no-editable
+
+# Install generated code into site-packages
+RUN bash ./scripts/install_generated_code.sh
+
+FROM base AS final
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/.venv/bin:$PATH"
+
+WORKDIR /envoy_extproc_sdk
+
+COPY --from=build /opt/.venv /opt/.venv
+
+COPY --from=build /envoy_extproc_sdk/envoy_extproc_sdk ./envoy_extproc_sdk
+COPY --from=build /envoy_extproc_sdk/generated ./generated
 
 ARG GRPC_PORT=50051
 EXPOSE ${GRPC_PORT}

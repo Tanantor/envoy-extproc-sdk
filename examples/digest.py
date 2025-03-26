@@ -27,7 +27,7 @@ def digest_headers(headers: ext_api.HttpHeaders, request: Dict) -> Any:
 
 
 class DigestExtProcService(BaseExtProcService):
-    def process_request_headers(
+    async def process_request_headers(
         self,
         headers: ext_api.HttpHeaders,
         context: ServicerContext,
@@ -49,7 +49,7 @@ class DigestExtProcService(BaseExtProcService):
 
         return response
 
-    def process_request_body(
+    async def process_request_body(
         self,
         body: ext_api.HttpBody,
         context: ServicerContext,
@@ -64,7 +64,7 @@ class DigestExtProcService(BaseExtProcService):
 
         return response
 
-    def process_response_body(
+    async def process_response_body(
         self,
         body: ext_api.HttpBody,
         context: ServicerContext,

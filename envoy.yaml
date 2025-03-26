@@ -2,7 +2,9 @@ static_resources:
   listeners:
     - name: listener
       address:
-        socket_address: {address: 0.0.0.0, port_value: 8000}
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8000
       filter_chains:
         - filters:
             - name: envoy.filters.network.http_connection_manager
@@ -10,6 +12,15 @@ static_resources:
                 "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
                 stat_prefix: envoy
                 codec_type: AUTO
+                use_remote_address: true
+                stream_idle_timeout: 300s # 5 minutes timeout for streaming responses
+                access_log:
+                  - name: envoy.access_loggers.stdout
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                      log_format:
+                        text_format_source:
+                          inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\"\n"
                 route_config:
                   name: local_route
                   virtual_hosts:
@@ -22,8 +33,13 @@ static_resources:
                             cluster: upstream
                           typed_per_filter_config:
                             envoy.filters.http.ext_proc:
-                              '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
                               disabled: true
+                        - match:
+                            prefix: "/completions"
+                          route:
+                            cluster_header: "x-route-to"
+                            timeout: 60s
                         - match:
                             prefix: "/"
                           route:
@@ -32,13 +48,13 @@ static_resources:
                   - name: envoy.filters.http.ext_proc
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
-                      grpc_service: 
+                      grpc_service:
                         envoy_grpc:
                           cluster_name: trivial
                         timeout: 30s
                       failure_mode_allow: true
                       message_timeout: 0.2s
-                      processing_mode: 
+                      processing_mode:
                         request_header_mode: SEND
                         response_header_mode: SEND
                         request_body_mode: BUFFERED
@@ -48,13 +64,13 @@ static_resources:
                   - name: envoy.filters.http.ext_proc
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
-                      grpc_service: 
+                      grpc_service:
                         envoy_grpc:
                           cluster_name: timer
                         timeout: 30s
                       failure_mode_allow: true
                       message_timeout: 0.2s
-                      processing_mode: 
+                      processing_mode:
                         request_header_mode: SEND
                         response_header_mode: SEND
                         request_body_mode: BUFFERED
@@ -64,13 +80,29 @@ static_resources:
                   - name: envoy.filters.http.ext_proc
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
-                      grpc_service: 
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: body_modify
+                        timeout: 30s
+                      failure_mode_allow: false
+                      message_timeout: 0.2s
+                      processing_mode:
+                        request_header_mode: SEND
+                        response_header_mode: SEND
+                        request_body_mode: BUFFERED
+                        response_body_mode: BUFFERED
+                        request_trailer_mode: SKIP
+                        response_trailer_mode: SKIP
+                  - name: envoy.filters.http.ext_proc
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+                      grpc_service:
                         envoy_grpc:
                           cluster_name: echo
                         timeout: 30s
                       failure_mode_allow: true
                       message_timeout: 0.2s
-                      processing_mode: 
+                      processing_mode:
                         request_header_mode: SEND
                         response_header_mode: SEND
                         request_body_mode: BUFFERED
@@ -80,13 +112,13 @@ static_resources:
                   - name: envoy.filters.http.ext_proc
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
-                      grpc_service: 
+                      grpc_service:
                         envoy_grpc:
                           cluster_name: digest
                         timeout: 30s
                       failure_mode_allow: true
                       message_timeout: 0.2s
-                      processing_mode: 
+                      processing_mode:
                         request_header_mode: SEND
                         response_header_mode: SEND
                         request_body_mode: BUFFERED
@@ -96,13 +128,13 @@ static_resources:
                   - name: envoy.filters.http.ext_proc
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
-                      grpc_service: 
+                      grpc_service:
                         envoy_grpc:
                           cluster_name: decorated
                         timeout: 30s
                       failure_mode_allow: true
                       message_timeout: 0.2s
-                      processing_mode: 
+                      processing_mode:
                         request_header_mode: SEND
                         response_header_mode: SEND
                         request_body_mode: BUFFERED
@@ -112,182 +144,301 @@ static_resources:
                   - name: envoy.filters.http.ext_proc
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
-                      grpc_service: 
+                      grpc_service:
                         envoy_grpc:
                           cluster_name: context
                         timeout: 30s
                       failure_mode_allow: true
                       message_timeout: 0.2s
-                      processing_mode: 
+                      processing_mode:
                         request_header_mode: SEND
                         response_header_mode: SEND
                         request_body_mode: BUFFERED
                         response_body_mode: BUFFERED
                         request_trailer_mode: SKIP
                         response_trailer_mode: SKIP
+                  - name: envoy.filters.http.ext_proc
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: llm_proxy
+                        timeout: 60s
+                      failure_mode_allow: true
+                      message_timeout: 1s
+                      processing_mode:
+                        request_header_mode: SEND
+                        response_header_mode: SEND
+                        request_body_mode: BUFFERED
+                        response_body_mode: STREAMED
+                        request_trailer_mode: SKIP
+                        response_trailer_mode: SKIP
                   - name: envoy.filters.http.router
                     typed_config:
-                      '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
-  - name: listener
-    connect_timeout: 0.250s
-    type: LOGICAL_DNS
-    lb_policy: LEAST_REQUEST
-    dns_lookup_family: V4_ONLY
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http_protocol_options: {}
-    load_assignment:
-      cluster_name: listener
-      endpoints:
-        - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: localhost
-                    port_value: 8000
-  - name: upstream
-    connect_timeout: 0.250s
-    type: LOGICAL_DNS
-    lb_policy: LEAST_REQUEST
-    dns_lookup_family: V4_ONLY
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http_protocol_options: {}
-    load_assignment:
-      cluster_name: upstream
-      endpoints:
-        - lb_endpoints:
-            - endpoint:
-                hostname: upstream
-                address:
-                  socket_address:
-                    address: upstream
-                    port_value: 80
-  - name: trivial
-    dns_lookup_family: V4_ONLY
-    lb_policy: LEAST_REQUEST
-    load_assignment:
-      cluster_name: trivial
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: trivial
-                port_value: 50051
-            hostname: trivial
-    type: LOGICAL_DNS
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
+    - name: listener
+      connect_timeout: 0.250s
+      type: LOGICAL_DNS
+      lb_policy: LEAST_REQUEST
+      dns_lookup_family: V4_ONLY
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http_protocol_options: {}
+      load_assignment:
+        cluster_name: listener
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: localhost
+                      port_value: 8000
+    - name: upstream
+      connect_timeout: 0.250s
+      type: LOGICAL_DNS
+      lb_policy: LEAST_REQUEST
+      dns_lookup_family: V4_ONLY
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http_protocol_options: {}
+      load_assignment:
+        cluster_name: upstream
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  hostname: upstream
+                  address:
+                    socket_address:
+                      address: upstream
+                      port_value: 80
 
-  - name: timer
-    dns_lookup_family: V4_ONLY
-    lb_policy: LEAST_REQUEST
-    load_assignment:
-      cluster_name: timer
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: timer
-                port_value: 50051
-            hostname: timer
-    type: LOGICAL_DNS
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
+    - name: streaming
+      connect_timeout: 0.250s
+      type: LOGICAL_DNS
+      lb_policy: LEAST_REQUEST
+      dns_lookup_family: V4_ONLY
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http_protocol_options: {}
+      load_assignment:
+        cluster_name: default_llm_provider
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  hostname: streaming
+                  address:
+                    socket_address:
+                      address: streaming
+                      port_value: 80
 
-  - name: echo
-    dns_lookup_family: V4_ONLY
-    lb_policy: LEAST_REQUEST
-    load_assignment:
-      cluster_name: echo
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: echo
-                port_value: 50051
-            hostname: echo
-    type: LOGICAL_DNS
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
+    - name: openai
+      connect_timeout: 0.250s
+      type: LOGICAL_DNS
+      lb_policy: LEAST_REQUEST
+      dns_lookup_family: V4_ONLY
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http_protocol_options: {}
+      load_assignment:
+        cluster_name: openai
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  hostname: openai
+                  address:
+                    socket_address:
+                      address: openai
+                      port_value: 80
 
-  - name: digest
-    dns_lookup_family: V4_ONLY
-    lb_policy: LEAST_REQUEST
-    load_assignment:
-      cluster_name: digest
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: digest
-                port_value: 50051
-            hostname: digest
-    type: LOGICAL_DNS
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
+    - name: anthropic
+      connect_timeout: 0.250s
+      type: LOGICAL_DNS
+      lb_policy: LEAST_REQUEST
+      dns_lookup_family: V4_ONLY
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http_protocol_options: {}
+      load_assignment:
+        cluster_name: anthropic
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  hostname: anthropic
+                  address:
+                    socket_address:
+                      address: anthropic
+                      port_value: 80
+    - name: trivial
+      dns_lookup_family: V4_ONLY
+      lb_policy: LEAST_REQUEST
+      load_assignment:
+        cluster_name: trivial
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: trivial
+                      port_value: 50051
+                  hostname: trivial
+      type: LOGICAL_DNS
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
 
-  - name: decorated
-    dns_lookup_family: V4_ONLY
-    lb_policy: LEAST_REQUEST
-    load_assignment:
-      cluster_name: decorated
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: decorated
-                port_value: 50051
-            hostname: decorated
-    type: LOGICAL_DNS
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
+    - name: timer
+      dns_lookup_family: V4_ONLY
+      lb_policy: LEAST_REQUEST
+      load_assignment:
+        cluster_name: timer
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: timer
+                      port_value: 50051
+                  hostname: timer
+      type: LOGICAL_DNS
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
 
-  - name: context
-    dns_lookup_family: V4_ONLY
-    lb_policy: LEAST_REQUEST
-    load_assignment:
-      cluster_name: context
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: context
-                port_value: 50051
-            hostname: context
-    type: LOGICAL_DNS
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
+    - name: echo
+      dns_lookup_family: V4_ONLY
+      lb_policy: LEAST_REQUEST
+      load_assignment:
+        cluster_name: echo
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: echo
+                      port_value: 50051
+                  hostname: echo
+      type: LOGICAL_DNS
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+
+    - name: digest
+      dns_lookup_family: V4_ONLY
+      lb_policy: LEAST_REQUEST
+      load_assignment:
+        cluster_name: digest
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: digest
+                      port_value: 50051
+                  hostname: digest
+      type: LOGICAL_DNS
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+
+    - name: decorated
+      dns_lookup_family: V4_ONLY
+      lb_policy: LEAST_REQUEST
+      load_assignment:
+        cluster_name: decorated
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: decorated
+                      port_value: 50051
+                  hostname: decorated
+      type: LOGICAL_DNS
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+
+    - name: context
+      dns_lookup_family: V4_ONLY
+      lb_policy: LEAST_REQUEST
+      load_assignment:
+        cluster_name: context
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: context
+                      port_value: 50051
+                  hostname: context
+      type: LOGICAL_DNS
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+
+    - name: body_modify
+      dns_lookup_family: V4_ONLY
+      lb_policy: LEAST_REQUEST
+      load_assignment:
+        cluster_name: body_modify
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: body_modify
+                      port_value: 50051
+                  hostname: body_modify
+      type: LOGICAL_DNS
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+
+    - name: llm_proxy
+      dns_lookup_family: V4_ONLY
+      lb_policy: LEAST_REQUEST
+      load_assignment:
+        cluster_name: llm_proxy
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: llm_proxy
+                      port_value: 50051
+                  hostname: llm_proxy
+      type: LOGICAL_DNS
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
 
 admin:
   address:
-    socket_address: {address: 0.0.0.0, port_value: 9901}
+    socket_address: { address: 0.0.0.0, port_value: 9901 }

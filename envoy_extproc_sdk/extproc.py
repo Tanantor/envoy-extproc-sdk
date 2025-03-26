@@ -3,7 +3,16 @@ from __future__ import annotations
 from asyncio import CancelledError, iscoroutinefunction
 from enum import Enum
 from logging import getLogger
-from typing import Callable, Dict, Iterator, List, Optional, Tuple, Union
+from typing import (
+    AsyncGenerator,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from ddtrace import tracer  # noqa: F401
 from grpc import ServicerContext, StatusCode
@@ -48,7 +57,9 @@ class StopRequestProcessing(Exception):
     respond from cache after seeing the request headers and
     body."""
 
-    def __init__(self, response: ext_api.ImmediateResponse, reason: Optional[str] = None) -> None:
+    def __init__(
+        self, response: ext_api.ImmediateResponse, reason: Optional[str] = None
+    ) -> None:
         self.response = response
         self.reason = reason
 
@@ -86,9 +97,9 @@ class BaseExtProcService(EnvoyExtProcServicer):
 
     async def Process(
         self,
-        request_iterator: Iterator[ext_api.ProcessingRequest],
+        request_iterator: AsyncIterator[ext_api.ProcessingRequest],
         context: ServicerContext,
-    ) -> Iterator[ext_api.ProcessingResponse]:
+    ) -> AsyncGenerator[ext_api.ProcessingResponse, None]:
         """
         Basic stream handler. This creates a "local" ("request") context
         for each request and walks through the request iterator
@@ -119,12 +130,10 @@ class BaseExtProcService(EnvoyExtProcServicer):
             resource=f"/{ENVOY_SERVICE_NAME}/Process",
             span_type="grpc",
         ):
-
             # for each stream invocation, define a new "call" context/"request"
             request = {"__overhead_ns": 0, "__phase": "unknown", "__id": "unknown"}
 
             async for req in self.safe_iterator(request_iterator, context, request):
-
                 phase = req.WhichOneof("request")
                 request["__phase"] = phase
 
@@ -147,7 +156,7 @@ class BaseExtProcService(EnvoyExtProcServicer):
 
                 # get a response object to pass (convenience)
                 response = (
-                    ext_api.HeaderMutation() 
+                    ext_api.HeaderMutation()
                     if phase.endswith("trailers")
                     else ext_api.CommonResponse()
                 )
@@ -156,7 +165,10 @@ class BaseExtProcService(EnvoyExtProcServicer):
                 # that's an envoy configuration. To always capture this we
                 # could assert that the response headers ProcessingMode is
                 # always SEND
+                # Chain header only applies to response_headers phase
                 if REVEAL_EXTPROC_CHAIN and (phase == "response_headers"):
+                    # We know response is CommonResponse in this phase
+                    assert isinstance(response, ext_api.CommonResponse)
                     response = self.add_extprocs_chain_header(data, response)
 
                 # actually process the phase, wrapped for timing and tracing
@@ -164,18 +176,56 @@ class BaseExtProcService(EnvoyExtProcServicer):
                     response = await self.process_phase(
                         phase, data, context, request, response, action
                     )
+                    # Type inference can't handle ** construction with oneof fields
+                    # So we create the response objects directly
                     if phase.endswith("headers"):
-                        yield ext_api.ProcessingResponse(**{
-                            phase: ext_api.HeadersResponse(response=response)
-                        })
+                        headers_response = ext_api.HeadersResponse(
+                            response=response
+                            if isinstance(response, ext_api.CommonResponse)
+                            else None
+                        )
+                        if phase == "request_headers":
+                            result = ext_api.ProcessingResponse(
+                                request_headers=headers_response
+                            )
+                            yield result
+                        elif phase == "response_headers":
+                            result = ext_api.ProcessingResponse(
+                                response_headers=headers_response
+                            )
+                            yield result
                     elif phase.endswith("body"):
-                        yield ext_api.ProcessingResponse(**{
-                            phase: ext_api.BodyResponse(response=response)
-                        })
-                    else: # endswith("trailers") == True
-                        yield ext_api.ProcessingResponse(**{
-                            phase: ext_api.TrailersResponse(header_mutation=response)
-                        })
+                        body_response = ext_api.BodyResponse(
+                            response=response
+                            if isinstance(response, ext_api.CommonResponse)
+                            else None
+                        )
+                        if phase == "request_body":
+                            result = ext_api.ProcessingResponse(
+                                request_body=body_response
+                            )
+                            yield result
+                        elif phase == "response_body":
+                            result = ext_api.ProcessingResponse(
+                                response_body=body_response
+                            )
+                            yield result
+                    else:  # endswith("trailers") == True
+                        trailers_response = ext_api.TrailersResponse(
+                            header_mutation=response
+                            if isinstance(response, ext_api.HeaderMutation)
+                            else None
+                        )
+                        if phase == "request_trailers":
+                            result = ext_api.ProcessingResponse(
+                                request_trailers=trailers_response
+                            )
+                            yield result
+                        elif phase == "response_trailers":
+                            result = ext_api.ProcessingResponse(
+                                response_trailers=trailers_response
+                            )
+                            yield result
 
                 except StopRequestProcessing as err:
                     logger.debug(
@@ -188,17 +238,18 @@ class BaseExtProcService(EnvoyExtProcServicer):
                             "reason": err.reason or "none supplied",
                         },
                     )
-                    response = err.response
-                    if REVEAL_EXTPROC_CHAIN:
-                        response = self.add_extprocs_chain_header(data, response)
-                    yield ext_api.ProcessingResponse(immediate_response=response)
+                    immediate_response = err.response
+                    result = ext_api.ProcessingResponse(
+                        immediate_response=immediate_response
+                    )
+                    yield result
 
     async def safe_iterator(
         self,
-        request_iterator: Iterator[ext_api.ProcessingRequest],
+        request_iterator: AsyncIterator[ext_api.ProcessingRequest],
         context: ServicerContext,
         request: Dict,
-    ) -> Iterator[ext_api.ProcessingResponse]:
+    ) -> AsyncGenerator[ext_api.ProcessingRequest, None]:
         try:
             async for req in request_iterator:
                 yield req
@@ -221,14 +272,7 @@ class BaseExtProcService(EnvoyExtProcServicer):
         request: Dict,
         response: Union[ext_api.CommonResponse, ext_api.HeaderMutation],
         action: Callable,
-    ) -> Optional[
-        Union[
-            ext_api.CommonResponse,
-            ext_api.HeaderMutation,
-            ext_api.ImmediateResponse,
-        ]
-    ]:
-
+    ) -> Union[ext_api.CommonResponse, ext_api.HeaderMutation]:
         # actually process the request phase
         logger.debug(
             f"{self.name} started {phase}",
@@ -277,7 +321,9 @@ class BaseExtProcService(EnvoyExtProcServicer):
     #       ...
     #
 
-    def process(self, phase: ExtProcPhase) -> Callable:
+    def process(
+        self, phase: ExtProcPhase
+    ) -> Callable[[ExtProcHandler], ExtProcHandler]:
         def wrapper(func: ExtProcHandler) -> ExtProcHandler:
             setattr(self, f"process_{phase}", func)
             return getattr(self, f"process_{phase}")
@@ -356,12 +402,16 @@ class BaseExtProcService(EnvoyExtProcServicer):
     @staticmethod
     def just_continue_headers() -> ext_api.HeadersResponse:
         """generic "move on" headers response object (can be modified)"""
-        return ext_api.HeadersResponse(response=BaseExtProcService.just_continue_response())
+        return ext_api.HeadersResponse(
+            response=BaseExtProcService.just_continue_response()
+        )
 
     @staticmethod
     def just_continue_body() -> ext_api.BodyResponse:
         """generic "move on" body response object (can be modified)"""
-        return ext_api.BodyResponse(response=BaseExtProcService.just_continue_response())
+        return ext_api.BodyResponse(
+            response=BaseExtProcService.just_continue_response()
+        )
 
     @staticmethod
     def just_continue_trailers() -> ext_api.TrailersResponse:
@@ -372,10 +422,12 @@ class BaseExtProcService(EnvoyExtProcServicer):
     def form_immediate_response(
         status: EnvoyHttpStatusCode,
         headers: Dict[str, str],
-        body: str,
+        body: Optional[str] = None,
     ) -> ext_api.ImmediateResponse:
         status_code = EnvoyHttpStatus(code=status)
-        response = ext_api.ImmediateResponse(status=status_code, body=body)
+        response = ext_api.ImmediateResponse(
+            status=status_code, body=body.encode("utf-8") if body is not None else None
+        )
         response.headers.set_headers.extend(
             [
                 EnvoyHeaderValueOption(header=EnvoyHeaderValue(key=key, value=value))
@@ -406,7 +458,9 @@ class BaseExtProcService(EnvoyExtProcServicer):
     # pattern, yet be instance methods for convenience when subclassing
 
     @staticmethod
-    def get_header(headers: ext_api.HttpHeaders, name: str, lower_cased: bool = False) -> str:
+    def get_header(
+        headers: ext_api.HttpHeaders, name: str, lower_cased: bool = False
+    ) -> Optional[str]:
         """get a header value by name (envoy uses lower cased names)"""
         _name = name if lower_cased else name.lower()
         for header in headers.headers.headers:
@@ -419,17 +473,19 @@ class BaseExtProcService(EnvoyExtProcServicer):
         headers: ext_api.HttpHeaders,
         names: Union[Dict[str, str], List[Tuple[str, str]]],
         lower_cased: bool = False,
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Optional[str]]:
         """get multiple header values by name (envoy uses lower cased names)"""
 
         if isinstance(names, list):  # enforce dictionary input
-            return BaseExtProcService.get_headers(headers, dict(names), lower_cased=lower_cased)
+            return BaseExtProcService.get_headers(
+                headers, dict(names), lower_cased=lower_cased
+            )
 
         if not lower_cased:  # enforce lower-cased keys
             keys = {k.lower(): v for k, v in names.items()}
             return BaseExtProcService.get_headers(headers, keys, lower_cased=True)
 
-        results = {name: None for _, name in names.items()}  # initialize to None
+        results: Dict[str, Optional[str]] = {name: None for _, name in names.items()}
         for header in headers.headers.headers:
             if header.key in names:
                 results[names[header.key]] = header.value  # store value at mapped name
@@ -441,7 +497,9 @@ class BaseExtProcService(EnvoyExtProcServicer):
     ) -> ext_api.CommonResponse:
         """add a header to a CommonResponse"""
         header = EnvoyHeaderValue(key=key, value=value)
-        response.header_mutation.set_headers.append(EnvoyHeaderValueOption(header=header))
+        response.header_mutation.set_headers.append(
+            EnvoyHeaderValueOption(header=header)
+        )
         return response
 
     @staticmethod
@@ -451,7 +509,9 @@ class BaseExtProcService(EnvoyExtProcServicer):
     ) -> ext_api.CommonResponse:
         """add a set of headers to a CommonResponse"""
         if isinstance(headers, dict):
-            return BaseExtProcService.add_headers(response, [(k, v) for k, v in headers.items()])
+            return BaseExtProcService.add_headers(
+                response, [(k, v) for k, v in headers.items()]
+            )
         response.header_mutation.set_headers.extend(
             [
                 EnvoyHeaderValueOption(header=EnvoyHeaderValue(key=key, value=value))
@@ -461,7 +521,9 @@ class BaseExtProcService(EnvoyExtProcServicer):
         return response
 
     @staticmethod
-    def remove_header(response: ext_api.CommonResponse, name: str) -> ext_api.CommonResponse:
+    def remove_header(
+        response: ext_api.CommonResponse, name: str
+    ) -> ext_api.CommonResponse:
         """remove a header from a CommonResponse"""
         response.header_mutation.remove_headers.append(name)
         return response
@@ -475,7 +537,9 @@ class BaseExtProcService(EnvoyExtProcServicer):
         return response
 
     @staticmethod
-    def get_standard_request_headers(headers: ext_api.HttpHeaders) -> Dict[str, str]:
+    def get_standard_request_headers(
+        headers: ext_api.HttpHeaders,
+    ) -> Dict[str, Optional[str]]:
         """pull a chosen set of "standard" HTTP headers from envoy headers"""
         return BaseExtProcService.get_headers(
             headers,
@@ -484,7 +548,9 @@ class BaseExtProcService(EnvoyExtProcServicer):
         )
 
     @staticmethod
-    def get_standard_response_headers(headers: ext_api.HttpHeaders) -> Dict[str, str]:
+    def get_standard_response_headers(
+        headers: ext_api.HttpHeaders,
+    ) -> Dict[str, Optional[str]]:
         """pull a chosen set of "standard" HTTP headers from envoy headers"""
         return BaseExtProcService.get_headers(
             headers,
@@ -495,15 +561,17 @@ class BaseExtProcService(EnvoyExtProcServicer):
     def add_extprocs_chain_header(
         self,
         headers: ext_api.HttpHeaders,
-        response: Union[ext_api.CommonResponse, ext_api.ImmediateResponse],
-    ) -> Union[ext_api.CommonResponse, ext_api.ImmediateResponse]:
+        response: ext_api.CommonResponse,
+    ) -> ext_api.CommonResponse:
         """
         This function helps provide visibility into the customized filter chain.
         Not a helper, this should stay in the base processor logic.
         """
 
         header: EnvoyHeaderValueOption
-        filters_header = self.get_header(headers, EXTPROCS_APPLIED_HEADER, lower_cased=True)
+        filters_header = self.get_header(
+            headers, EXTPROCS_APPLIED_HEADER, lower_cased=True
+        )
         if filters_header:
             header = EnvoyHeaderValueOption(
                 header=EnvoyHeaderValue(
@@ -518,9 +586,7 @@ class BaseExtProcService(EnvoyExtProcServicer):
                 )
             )
 
-        if isinstance(response, ext_api.ImmediateResponse):
-            response.headers.set_headers.append(header)
-        else:
-            response.header_mutation.set_headers.append(header)
+        # We only support CommonResponse here now
+        response.header_mutation.set_headers.append(header)
 
         return response

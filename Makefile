@@ -1,4 +1,3 @@
-
 IMAGE_NAME=envoy-extproc-sdk-python
 IMAGE_TAG=`git rev-parse HEAD`
 GENERATED_CODE=generated/python/standardproto
@@ -12,15 +11,15 @@ update: python-update buf-update codegen
 
 .PHONY: python-install
 python-install:
-	poetry install
+	uv sync
 
 .PHONY: python-update
 python-update:
-	poetry update
+	uv sync --upgrade
 
 .PHONY: buf-update 
-buf-update :
-	buf mod update
+buf-update:
+	buf dep update
 
 .PHONY: codegen
 codegen:
@@ -34,40 +33,44 @@ codegen:
 
 .PHONY: format
 format:
-	poetry run isort envoy_extproc_sdk examples tests
-	poetry run black envoy_extproc_sdk examples tests
-	poetry run flake8 envoy_extproc_sdk examples tests
+	uv run isort envoy_extproc_sdk examples tests
+	uv run black envoy_extproc_sdk examples tests
+	uv run flake8 envoy_extproc_sdk examples tests
 
-.PHONY: types
+.PHONY: types types-main
 types:
-	poetry run mypy envoy_extproc_sdk examples tests
+	uv run mypy envoy_extproc_sdk examples tests
+
+types-main:
+	uv run mypy envoy_extproc_sdk examples
 
 .PHONY: lint
 check-format:
-	poetry run isort envoy_extproc_sdk examples tests --check
-	poetry run black envoy_extproc_sdk examples tests --check
-	poetry run flake8 envoy_extproc_sdk examples tests
+	uv run isort envoy_extproc_sdk examples tests --check
+	uv run black envoy_extproc_sdk examples tests --check
+	uv run flake8 envoy_extproc_sdk examples tests
 
 .PHONY: unit-test
 unit-test: 
 	DD_TRACE_ENABLED=false \
-		poetry run python -m pytest -v tests/unit
+		uv run pytest -v tests/unit
 
 .PHONY: integration-test
-integration-test: 
+integration-test: up-test
+	sleep 5
 	DD_TRACE_ENABLED=false \
-		poetry run python -m pytest tests/integration
+		uv run pytest -v tests/integration
 
 .PHONY: coverage
 coverage: 
 	DD_TRACE_ENABLED=false \
-		poetry run coverage run -m pytest -v tests/unit \
+		uv run coverage run -m pytest -v tests/unit \
 			--junitxml=test-results/junit.xml
-	poetry run coverage report -m
+	uv run coverage report -m
 
 .PHONY: run
 run:
-	poetry run python -m envoy_extproc_sdk --service $(SERVICE) --logging
+	uv run python -m envoy_extproc_sdk --service $(SERVICE) --logging
 
 .PHONY: build
 build:
@@ -76,18 +79,43 @@ build:
 		--build-arg IMAGE_TAG=$(IMAGE_TAG) \
 		-t $(IMAGE_NAME)-examples:$(IMAGE_TAG)
 
+.PHONY: build-base
+build-base:
+	docker compose build base
+
 .PHONY: up
-up:
-	docker-compose up --build
+up: build-base
+	docker compose up --build
 
 .PHONY: down
 down:
-	docker-compose down --volumes
+	docker compose down --volumes
+
+.PHONY: up-test
+up-test: build-base
+	docker compose up --build -d
+
+.PHONY: down-test
+down-test:
+	docker compose down --volumes
+
+.PHONY: integration-test-local
+integration-test-local: 
+	DD_TRACE_ENABLED=false \
+		uv run pytest -v tests/integration
+
+.PHONY: test
+test: unit-test integration-test down-test
+
+.PHONY: test-flake-finder
+test-flake-finder:
+	@uv run pytest tests/unit --flake-finder
+	@uv run pytest tests/integration --flake-finder
 
 .PHONY: package
 package:
-	poetry build
+	uv pip build
 
 .PHONY: publish
 publish:
-	poetry publish -r pypi --build
+	uv pip publish --build

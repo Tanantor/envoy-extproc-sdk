@@ -2,6 +2,7 @@ import argparse
 from importlib import import_module
 import logging
 from os import environ
+from typing import Callable, List
 
 from .extproc import BaseExtProcService
 from .server import serve
@@ -10,7 +11,7 @@ from .settings import GRPC_PORT, SHUTDOWN_GRACE_PERIOD
 logger = logging.getLogger(__name__)
 
 # Coroutines to be invoked when the event loop is shutting down.
-_cleanup = []
+_cleanup: List[Callable[[], None]] = []
 
 
 def import_from_spec(spec: str) -> BaseExtProcService:
@@ -18,7 +19,15 @@ def import_from_spec(spec: str) -> BaseExtProcService:
     symbol_name = spec.split(".")[-1]
     module = import_module(module_spec)
     if hasattr(module, symbol_name):
-        return getattr(module, symbol_name)
+        service_class = getattr(module, symbol_name)
+        if isinstance(service_class, BaseExtProcService):
+            return service_class
+        elif callable(service_class) and issubclass(service_class, BaseExtProcService):
+            return service_class()
+        else:
+            raise TypeError(
+                f"{symbol_name} must be a BaseExtProcService or a callable returning BaseExtProcService"
+            )
     raise AttributeError(f"{module_spec} has no attribute {symbol_name}")
 
 

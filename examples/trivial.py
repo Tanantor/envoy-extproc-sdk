@@ -5,7 +5,7 @@
 # `x-request-id` header (with the same value) to both the
 # upstream and back to the caller, as `x-extra-request-id`.
 
-from typing import Dict, Union
+from typing import Dict
 
 from envoy_extproc_sdk import BaseExtProcService, ext_api, serve
 from grpc import ServicerContext
@@ -14,7 +14,7 @@ EXTRA_REQUEST_ID_HEADER = "x-extra-request-id"
 
 
 class TrivialExtProcService(BaseExtProcService):
-    def process_request_headers(
+    async def process_request_headers(
         self,
         headers: ext_api.HttpHeaders,
         context: ServicerContext,
@@ -28,12 +28,12 @@ class TrivialExtProcService(BaseExtProcService):
         )
         return response
 
-    def process_response_headers(
+    async def process_response_headers(
         self,
         headers: ext_api.HttpHeaders,
         context: ServicerContext,
         request: Dict,
-        response: ext_api.HeadersResponse,
+        response: ext_api.CommonResponse,
     ) -> ext_api.CommonResponse:
         self.add_header(
             response,

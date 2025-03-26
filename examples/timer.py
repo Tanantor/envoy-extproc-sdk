@@ -25,7 +25,7 @@ class TimerExtProcService(BaseExtProcService):
     any upstream filters (or services) as well as a duration
     (over upstreams) response header"""
 
-    def process_request_headers(
+    async def process_request_headers(
         self,
         headers: ext_api.HttpHeaders,
         context: ServicerContext,
@@ -37,7 +37,7 @@ class TimerExtProcService(BaseExtProcService):
         self.add_header(response, REQUEST_STARTED_HEADER, request["timer"].started_iso())
         return response
 
-    def process_response_body(
+    async def process_response_body(
         self,
         body: ext_api.HttpBody,
         context: ServicerContext,
