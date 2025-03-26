@@ -157,6 +157,22 @@ static_resources:
                         response_body_mode: BUFFERED
                         request_trailer_mode: SKIP
                         response_trailer_mode: SKIP
+                  - name: envoy.filters.http.ext_proc
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+                      grpc_service: 
+                        envoy_grpc:
+                          cluster_name: llm_proxy
+                        timeout: 30s
+                      failure_mode_allow: true
+                      message_timeout: 0.2s
+                      processing_mode: 
+                        request_header_mode: SEND
+                        response_header_mode: SEND
+                        request_body_mode: BUFFERED
+                        response_body_mode: STREAMED
+                        request_trailer_mode: SKIP
+                        response_trailer_mode: SKIP
                   - name: envoy.filters.http.router
                     typed_config:
                       '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -333,6 +349,26 @@ static_resources:
                 address: body_modify
                 port_value: 50051
             hostname: body_modify
+    type: LOGICAL_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+
+  - name: llm_proxy
+    dns_lookup_family: V4_ONLY
+    lb_policy: LEAST_REQUEST
+    load_assignment:
+      cluster_name: llm_proxy
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: llm_proxy
+                port_value: 50051
+            hostname: llm_proxy
     type: LOGICAL_DNS
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
