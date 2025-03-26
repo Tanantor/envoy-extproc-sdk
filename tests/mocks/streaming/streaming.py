@@ -7,14 +7,13 @@ the PROVIDER environment variable. It includes provider information in the
 response chunks to demonstrate header-based routing in Envoy.
 """
 
+from http import HTTPStatus
 import http.server
 import json
+import logging
 import os
 import socketserver
 import time
-from http import HTTPStatus
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -38,16 +37,14 @@ class StreamingHandler(http.server.BaseHTTPRequestHandler):
         # Read request body handling both Content-Length and Transfer-Encoding: chunked
         transfer_encoding = self.headers.get("Transfer-Encoding", "")
         is_chunked = "chunked" in transfer_encoding.lower()
-        
+
         # Get content length from header or x-content-length (set by ExtProc)
         content_length = int(
-            self.headers.get(
-                "Content-Length", self.headers.get("x-content-length", "0")
-            )
+            self.headers.get("Content-Length", self.headers.get("x-content-length", "0"))
         )
-        
+
         logger.debug(f"Content length: {content_length}, chunked: {is_chunked}")
-        
+
         if is_chunked:
             body_bytes = bytearray()
             while True:
@@ -71,7 +68,7 @@ class StreamingHandler(http.server.BaseHTTPRequestHandler):
             body = self.rfile.read(content_length).decode("utf-8")
         else:
             body = "{}"
-        
+
         logger.debug(f"Request body: {body}")
 
         try:
@@ -103,10 +100,10 @@ class StreamingHandler(http.server.BaseHTTPRequestHandler):
                 self.send_header("x-llm-proxy", "true")
                 self.end_headers()
 
-                # Get model from the request body  
+                # Get model from the request body
                 model = request_data.get("model", "streaming-default-model")
                 logger.debug(f"Using model from request body: {model}")
-                
+
                 # Send initial chunk
                 initial_data = json.dumps(
                     {
@@ -128,7 +125,7 @@ class StreamingHandler(http.server.BaseHTTPRequestHandler):
 
                 # Send a few content chunks with provider information
                 provider_msg = f"Response from {PROVIDER} provider. "
-                
+
                 for i in range(3):
                     content = f"part {i + 1} " + (provider_msg if i == 0 else "")
                     chunk_data = json.dumps(
@@ -206,9 +203,7 @@ class StreamingHandler(http.server.BaseHTTPRequestHandler):
 
 def run_server():
     FORMAT = "%(asctime)s : %(levelname)s : %(message)s"
-    logging.basicConfig(
-        level=logging.DEBUG, format=FORMAT, handlers=[logging.StreamHandler()]
-    )
+    logging.basicConfig(level=logging.DEBUG, format=FORMAT, handlers=[logging.StreamHandler()])
     logger = logging.getLogger(__name__)
 
     with socketserver.TCPServer(("", PORT), StreamingHandler) as httpd:

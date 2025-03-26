@@ -1,6 +1,7 @@
-import pytest
 import json
+
 from httpx import AsyncClient
+import pytest
 
 
 @pytest.mark.asyncio
@@ -10,7 +11,6 @@ async def test_trivial_service(http_client: AsyncClient, request_id: str):
 
     assert response.status_code == 200
 
-    # Check response body
     body = response.json()
     assert body["path"].startswith("/test-trivial")
 
@@ -27,7 +27,6 @@ async def test_timer_service(http_client: AsyncClient, request_id: str):
 
     assert response.status_code == 200
 
-    # Check response body
     body = response.json()
     assert body["path"].startswith("/test-timer")
 
@@ -76,7 +75,6 @@ async def test_digest_service(http_client: AsyncClient, request_id: str):
 
     assert response.status_code == 200
 
-    # Check response body
     body = response.json()
     assert body["path"].startswith("/test-digest")
 
@@ -93,13 +91,10 @@ async def test_decorated_service(http_client: AsyncClient, request_id: str):
     """Test that the DecoratedExtProcService behaves like the DigestExtProcService."""
     test_data = {"test": "data"}
 
-    response = await http_client.post(
-        f"/test-decorated?id={request_id}", json=test_data
-    )
+    response = await http_client.post(f"/test-decorated?id={request_id}", json=test_data)
 
     assert response.status_code == 200
 
-    # Check response body
     body = response.json()
     assert body["path"].startswith("/test-decorated")
 
@@ -124,7 +119,6 @@ async def test_context_service(http_client: AsyncClient, request_id: str):
 
     assert response.status_code == 200
 
-    # Check response body
     body = response.json()
     assert body["path"].startswith("/test-context")
 

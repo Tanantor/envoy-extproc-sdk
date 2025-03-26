@@ -3,7 +3,7 @@
 # TBD
 
 from json import loads
-from typing import Dict, Union
+from typing import Dict
 
 from envoy_extproc_sdk import BaseExtProcService, ext_api, serve
 from grpc import ServicerContext
@@ -12,7 +12,7 @@ CONTEXT_ID_HEADER = "x-context-id"
 
 
 class CtxExtProcService(BaseExtProcService):
-    def process_request_headers(
+    async def process_request_headers(
         self,
         headers: ext_api.HttpHeaders,
         context: ServicerContext,
@@ -23,7 +23,7 @@ class CtxExtProcService(BaseExtProcService):
         self.add_header(response, CONTEXT_ID_HEADER, request["cid"])
         return response
 
-    def process_request_body(
+    async def process_request_body(
         self,
         body: ext_api.HttpBody,
         context: ServicerContext,
@@ -35,7 +35,7 @@ class CtxExtProcService(BaseExtProcService):
             assert cid == request["cid"]
         return response
 
-    def process_response_body(
+    async def process_response_body(
         self,
         body: ext_api.HttpBody,
         context: ServicerContext,

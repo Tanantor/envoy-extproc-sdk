@@ -2,8 +2,8 @@ import http.server
 import json
 import logging
 from os import environ
-from typing import Any, Dict
 import socketserver
+from typing import Any, Dict
 from urllib.parse import parse_qs
 
 ECHO_PORT = int(environ.get("ECHO_PORT", "80"))
@@ -45,19 +45,15 @@ class H(Handler):
 
         self.rsp["path"] = self.path
         self.rsp["headers"] = {k: v for k, v in self.headers.items()}
-        # Check if we're getting chunked encoding
         transfer_encoding = self.headers.get("Transfer-Encoding", "")
         is_chunked = "chunked" in transfer_encoding.lower()
 
         content_length = int(
-            self.headers.get(
-                "Content-Length", self.headers.get("x-content-length", "0")
-            )
+            self.headers.get("Content-Length", self.headers.get("x-content-length", "0"))
         )
         logger.debug(f"content_length: {content_length}, chunked: {is_chunked}")
 
         if is_chunked:
-            # Handle chunked encoding
             data = b""
             while True:
                 # Read the chunk size line
@@ -125,9 +121,7 @@ class H(Handler):
 
 if __name__ == "__main__":
     FORMAT = "%(asctime)s : %(levelname)s : %(message)s"
-    logging.basicConfig(
-        level=logging.INFO, format=FORMAT, handlers=[logging.StreamHandler()]
-    )
+    logging.basicConfig(level=logging.INFO, format=FORMAT, handlers=[logging.StreamHandler()])
     logger = logging.getLogger(__name__)
 
     with socketserver.TCPServer(("", ECHO_PORT), H) as httpd:

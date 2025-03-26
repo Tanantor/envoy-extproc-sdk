@@ -1,11 +1,11 @@
 from json import dumps
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..util.envoy import EnvoyHeaderMap, EnvoyHeaderValue, ext_api
 
 
 def envoy_headers(
-    headers: Union[Dict[str, str], List[Tuple[str, str]]] = None
+    headers: Optional[Union[Dict[str, str], List[Tuple[str, str]]]] = None
 ) -> ext_api.HttpHeaders:
     """Create envoy-typed headers from a list of key-value-pair tuples"""
     if not headers:
@@ -21,7 +21,9 @@ def envoy_headers(
     raise ValueError(f"Unparseable headers type {type(headers)}")
 
 
-def envoy_body(body: Union[bytes, int, str, list, dict] = None) -> ext_api.HttpBody:
+def envoy_body(
+    body: Optional[Union[bytes, int, str, List[Any], Dict[Any, Any]]] = None
+) -> ext_api.HttpBody:
     """Create envoy-typed body from several types"""
     if body is None:
         return ext_api.HttpBody()

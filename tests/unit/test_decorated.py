@@ -1,4 +1,5 @@
 import re
+from typing import cast
 from uuid import uuid4
 
 from envoy_extproc_sdk import ext_api
@@ -9,6 +10,7 @@ from envoy_extproc_sdk.testing import (
     envoy_set_headers_to_dict,
 )
 from examples import DecoratedExtProcService
+from grpc import ServicerContext
 import pytest
 
 
@@ -51,11 +53,11 @@ import pytest
 async def test_digester_flow(headers: ext_api.HttpHeaders, body: ext_api.HttpBody) -> None:
 
     E = AsEnvoyExtProc(request_headers=headers, request_body=body)
-    P = DecoratedExtProcService
+    P = DecoratedExtProcService()
 
     method = P.get_header(headers, ":method")
 
-    async for response in P.Process(E, None):
+    async for response in P.Process(E, cast(ServicerContext, None)):
 
         if response.WhichOneof("response") == "request_headers":
             assert isinstance(response.request_headers, ext_api.HeadersResponse)

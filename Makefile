@@ -37,9 +37,12 @@ format:
 	uv run black envoy_extproc_sdk examples tests
 	uv run flake8 envoy_extproc_sdk examples tests
 
-.PHONY: types
+.PHONY: types types-main
 types:
 	uv run mypy envoy_extproc_sdk examples tests
+
+types-main:
+	uv run mypy envoy_extproc_sdk examples
 
 .PHONY: lint
 check-format:

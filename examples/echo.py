@@ -10,6 +10,7 @@
 # an "error" but rather a signal of the need to stop request
 # processing.
 
+import json
 import re
 from typing import Dict
 
@@ -26,7 +27,7 @@ TRUTHY_REGEX = re.compile(r"^([Tt](rue)?|[Yy](es)?)$")
 
 
 class EchoExtProcService(BaseExtProcService):
-    def process_request_headers(
+    async def process_request_headers(
         self,
         headers: ext_api.HttpHeaders,
         context: ServicerContext,
@@ -38,7 +39,7 @@ class EchoExtProcService(BaseExtProcService):
             request["request_headers"][header.key] = header.value
         return response
 
-    def process_request_body(
+    async def process_request_body(
         self,
         body: ext_api.HttpBody,
         context: ServicerContext,
@@ -53,10 +54,15 @@ class EchoExtProcService(BaseExtProcService):
         if not match:
             return response
 
-        response = self.form_immediate_response(
-            EnvoyHttpStatusCode.OK, request["request_headers"], body.body
+        response_body = {"body": body.body.decode("utf-8")}
+
+        headers = request["request_headers"].copy()
+        headers["content-type"] = "application/json"
+        
+        immediate_response = self.form_immediate_response(
+            EnvoyHttpStatusCode.OK, headers, json.dumps(response_body)
         )
-        raise StopRequestProcessing(response=response)
+        raise StopRequestProcessing(response=immediate_response)
 
 
 if __name__ == "__main__":

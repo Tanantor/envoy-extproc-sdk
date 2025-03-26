@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class LLMProxyExtProcService(BaseExtProcService):
-    def process_request_headers(
+    async def process_request_headers(
         self,
         headers: ext_api.HttpHeaders,
         context: ServicerContext,
@@ -48,10 +48,7 @@ class LLMProxyExtProcService(BaseExtProcService):
         content_type = self.get_header(headers, "content-type")
         request["content_type"] = content_type
 
-        # NOTE: We can't actually change the host/destination here in the ExtProc service.
-        # The host rewriting must be done in the Envoy configuration via routes.
-        # We'll add a header to simulate/test this capability, but in production,
-        # you would need to configure Envoy routes to send traffic to the desired upstream.
+        # this is unused, using dynamic routing based on ROUTE_HEADER
         self.add_header(response, "x-target-host", "api.openai.com")
 
         # Replace the Authorization header
@@ -66,7 +63,7 @@ class LLMProxyExtProcService(BaseExtProcService):
 
         return response
 
-    def process_request_body(
+    async def process_request_body(
         self,
         body: ext_api.HttpBody,
         context: ServicerContext,
@@ -76,10 +73,7 @@ class LLMProxyExtProcService(BaseExtProcService):
         if not request["path"].endswith(TARGET_ENDPOINT):
             return response
 
-        if (
-            request.get("content_type")
-            and "application/json" in request["content_type"]
-        ):
+        if request.get("content_type") and "application/json" in request["content_type"]:
             try:
                 body_str = body.body.decode("utf-8")
                 logger.debug(f"ORIGINAL BODY: {body_str}")
@@ -95,11 +89,9 @@ class LLMProxyExtProcService(BaseExtProcService):
 
                     # Set routing headers based on the model
                     self.add_header(response, TARGET_MODEL_HEADER, original_model)
-                    target_route = MODEL_ROUTES.get(
-                        original_model, MODEL_ROUTES["default"]
-                    )
+                    target_route = MODEL_ROUTES.get(original_model, MODEL_ROUTES["default"])
                     self.add_header(response, ROUTE_HEADER, target_route)
-                    # Clear the route cache for the current client request. 
+                    # Clear the route cache for the current client request.
                     # We modified headers that are used to calculate the route.
                     response.clear_route_cache = True
 
@@ -116,13 +108,12 @@ class LLMProxyExtProcService(BaseExtProcService):
 
                 if modified:
                     new_body = json.dumps(json_body).encode("utf-8")
-                    
-                    # Print the modified body for debugging
+
                     logger.debug(f"MODIFIED BODY SENT: {new_body.decode('utf-8')}")
 
                     response.body_mutation.body = new_body
 
-                    # Note: When working with Envoy ExtProc, we intentionally don't set the content-length header
+                    # When working with Envoy ExtProc, we don't set the content-length header
                     # as Envoy uses transfer-encoding: chunked when body is modified.
                     self.add_header(response, "x-content-length", str(len(new_body)))
                     request["body_modified"] = True
@@ -132,7 +123,7 @@ class LLMProxyExtProcService(BaseExtProcService):
                 pass
         return response
 
-    def process_response_headers(
+    async def process_response_headers(
         self,
         headers: ext_api.HttpHeaders,
         context: ServicerContext,
@@ -149,12 +140,10 @@ class LLMProxyExtProcService(BaseExtProcService):
         if "original_model" in request:
             self.add_header(response, "x-original-model", request["original_model"])
 
-        # Check if this is a streaming response
+        # Check if this is a streaming response (for demo/debug purposes)
         content_type = self.get_header(headers, "content-type")
         if content_type and "text/event-stream" in content_type.lower():
-            logger.debug(
-                "Detected streaming response with content-type: %s", content_type
-            )
+            logger.debug("Detected streaming response with content-type: %s", content_type)
         return response
 
 
@@ -162,8 +151,6 @@ if __name__ == "__main__":
     import logging
 
     FORMAT = "%(asctime)s : %(levelname)s : %(message)s"
-    logging.basicConfig(
-        level=logging.INFO, format=FORMAT, handlers=[logging.StreamHandler()]
-    )
+    logging.basicConfig(level=logging.INFO, format=FORMAT, handlers=[logging.StreamHandler()])
 
     serve(service=LLMProxyExtProcService())

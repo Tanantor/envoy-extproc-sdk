@@ -16,11 +16,11 @@ for DIRECTORY in $(find generated/python/standardproto -type d -maxdepth 1 -mind
     echo "  installing $(basename ${DIRECTORY}) to ${INSTALL_NAME}"
     cp -r ${DIRECTORY} ${SITE_PACKAGES}
     
-    # Create an empty py.typed file in the installed directory to mark it as typed
+    # Create an py.typed file in the installed directory to mark it as typed
     echo "  adding py.typed to $(basename ${DIRECTORY})"
     touch ${INSTALL_NAME}/py.typed
     
-    # If this is the envoy module, also add py.typed to the service/ext_proc/v3 subdirectory
+    # For the envoy module, also add py.typed to the service/ext_proc/v3 subdirectory
     if [ "$(basename ${DIRECTORY})" = "envoy" ]; then
         echo "  adding py.typed to envoy/service/ext_proc/v3"
         mkdir -p ${INSTALL_NAME}/service/ext_proc/v3

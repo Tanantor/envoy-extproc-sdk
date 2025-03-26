@@ -1,7 +1,9 @@
 from typing import AsyncGenerator
+import uuid
+
 from httpx import AsyncClient
 import pytest_asyncio
-import uuid
+
 
 @pytest_asyncio.fixture
 async def http_client() -> AsyncGenerator[AsyncClient, None]:

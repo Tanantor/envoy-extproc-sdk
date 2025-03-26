@@ -16,7 +16,7 @@
 
 from typing import Dict
 
-from envoy_extproc_sdk import BaseExtProcService, ext_api, serve
+from envoy_extproc_sdk import BaseExtProcService, ext_api, ExtProcPhase, serve
 from grpc import ServicerContext
 
 from .digest import digest_headers
@@ -27,7 +27,7 @@ TENANT_ID_HEADER = "x-tenant-id"
 DecoratedExtProcService = BaseExtProcService(name="DecoratedExtProcService")
 
 
-@DecoratedExtProcService.process("request_headers")
+@DecoratedExtProcService.process(ExtProcPhase.request_headers)
 def start_digest(
     headers: ext_api.HttpHeaders,
     context: ServicerContext,
@@ -44,7 +44,7 @@ def start_digest(
     return response
 
 
-@DecoratedExtProcService.process("request_body")
+@DecoratedExtProcService.process(ExtProcPhase.request_body)
 def complete_digest(
     body: ext_api.HttpBody,
     context: ServicerContext,

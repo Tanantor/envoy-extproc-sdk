@@ -32,7 +32,6 @@ WORKDIR /envoy_extproc_sdk
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:0.6.8 /uv /usr/local/bin/uv
 
-# Create virtual environment
 RUN python -m venv /opt/.venv
 ENV PATH="/opt/.venv/bin:$PATH"
 
@@ -68,10 +67,8 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /envoy_extproc_sdk
 
-# Copy virtual environment from build stage
 COPY --from=build /opt/.venv /opt/.venv
 
-# Copy source code and generated protobuf files
 COPY --from=build /envoy_extproc_sdk/envoy_extproc_sdk ./envoy_extproc_sdk
 COPY --from=build /envoy_extproc_sdk/generated ./generated
 
