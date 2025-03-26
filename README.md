@@ -4,7 +4,7 @@
 
 [`envoy`](https://www.envoyproxy.io/), one of the most powerful and widely used reverse proxies, is able to query an [ExternalProcessor](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_proc_filter) gRPC service in it's filter chain. This functionality opens the door to quickly and robustly implemently customized functions at the edge, instead of in targeted services. [Bond](www.bond.tech), for example, is using this functionality to implement authentication, API call logging, and write-request idempotency. While powerful, implementing these services still requires dealing with complicated `envoy` specs, managing information sharing across request phases, and an understanding of gRPC, none of which are exactly straightforward. 
 
-**The purpose of this SDK is to make development of ExternalProcessors easy**. This SDK _certainly_ won't supply the most _performant_ edge functions. With the `docker-compose` setup here we see an overhead of about 20ms/req with 6 processors in the filter chain, or maybe about 4-5ms/req per filter. Without a doubt, much better performance will come from eschewing the ease-of-use functionality here, packing processor functions together in one filter, implementing your filter in a compiled language, or even more likely _not using an ExternalProcessor at all_ but instead using a [WASM plugin](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/wasm/v3/wasm.proto) or registered [custom filter binary](https://github.com/envoyproxy/envoy-filter-example). Optimal performance isn't our goal; usability, maintainability, and low time-to-functionality is, and those aspects can often be more important than minimal latency. 
+**The purpose of this SDK is to make development of ExternalProcessors easy**. This SDK _certainly_ won't supply the most _performant_ edge functions. With the `docker compose` setup here we see an overhead of about 20ms/req with 6 processors in the filter chain, or maybe about 4-5ms/req per filter. Without a doubt, much better performance will come from eschewing the ease-of-use functionality here, packing processor functions together in one filter, implementing your filter in a compiled language, or even more likely _not using an ExternalProcessor at all_ but instead using a [WASM plugin](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/wasm/v3/wasm.proto) or registered [custom filter binary](https://github.com/envoyproxy/envoy-filter-example). Optimal performance isn't our goal; usability, maintainability, and low time-to-functionality is, and those aspects can often be more important than minimal latency. 
 
 ### Usage
 
@@ -64,7 +64,7 @@ Storing and managing that inter-phase data is what `request` is for; see `exampl
 
 We distribute this as `python` [package on pypi](https://pypi.org/project/envoy-extproc-sdk/#description)
 ```
-$ pip install envoy-extproc-sdk
+$ uv pip install envoy-extproc-sdk
 ```
 and as a `docker` container on [dockerhub](https://hub.docker.com/r/wrossmorrow/envoy-extproc-sdk-python)
 ```
@@ -72,7 +72,7 @@ $ docker pull envoy-extproc-sdk-python:latest
 ```
 Note we do _not_ package generated code from `envoy`'s `protobuf` specs in the `python` module. (The `grpc` libraries themselves are "broken" relative to newer `protobuf` because they embedd old generated code for health checks, which seem now unusable.) So if you use the `python` package you have to build and install the `protobuf` generated code from `envoy` (see `buf.yaml` here and `make codegen`) for it to work. We recommend following our approach here, as we customize handling of the health check generated code. 
 
-You can build on top of the `envoy_extproc_sdk` `docker` image and avoid this, as we _do_ package the generated code in images. This can be done in the normal way, actually as illustrated by the examples here. In fact, `examples/Dockerfile` (used in the `docker-compose.yaml`) is only
+You can build on top of the `envoy_extproc_sdk` `docker` image and avoid this, as we _do_ package the generated code in images. This can be done in the normal way, actually as illustrated by the examples here. In fact, `examples/Dockerfile` (used in the `docker compose.yaml`) is only
 ```
 # syntax=docker/dockerfile:1.2
 ARG IMAGE_TAG=latest
@@ -282,7 +282,7 @@ Trailers handlers are similar, but less likely to be used. See the code for deta
 
 ## Examples
 
-There are several examples in `examples/`. These can be packaged in the `docker` image built from `examples/Dockerfile` (see `make build`) and included as services in the `docker-compose.yaml`. The basic `envoy` config `envoy.yaml` (used by the `docker-compose`) sets each example up to be used. 
+There are several examples in `examples/`. These can be packaged in the `docker` image built from `examples/Dockerfile` (see `make build`) and included as services in the `docker compose.yaml`. The basic `envoy` config `envoy.yaml` (used by the `docker compose`) sets each example up to be used. 
 
 `envoy_extproc_sdk.BaseExtProcService`: The `BaseExtProcService` is an example in it's own right, but does nothing to requests. Using `LOG_LEVEL=DEBUG` will print log lines describing the processing steps taken. Run with
 ```
@@ -311,7 +311,7 @@ will run our first example, the "trivial" processor.
 ### Requirements
 
 * `python3.9`
-* `poetry` for package management
+* `uv` for package management
 * `make` for convenience commands
 * `protoc` and `buf` for generating code from `protobuf` schemas for `envoy`
 * `docker` for testing
@@ -335,7 +335,7 @@ Review the `Makefile` for other commands, including
 
 #### `docker`
 
-The `docker-compose` is a setup with `envoy`, a naive "echo" HTTP server (see `tests/mocks/echo/echo.py`), and the example ExternalProcessor services from `examples/`. This way you can make plain HTTP requests and actually see outcomes from the filters. The single upstream `echo` server responds to any request with a JSON payload containing the following keys
+The `docker compose` is a setup with `envoy`, a naive "echo" HTTP server (see `tests/mocks/echo/echo.py`), and the example ExternalProcessor services from `examples/`. This way you can make plain HTTP requests and actually see outcomes from the filters. The single upstream `echo` server responds to any request with a JSON payload containing the following keys
 * `method`: the request method it saw
 * `path`: the request path 
 * `headers`: a nested JSON of all the request headers it received

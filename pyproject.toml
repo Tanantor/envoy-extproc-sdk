@@ -1,38 +1,60 @@
-[tool.poetry]
+[project]
 name = "envoy_extproc_sdk"
-version = "0.1.1"
-description = "A python SDK for envoy External Processors"
-authors = ["W. Ross Morrow <morrowwr@gmail.com>"]
-license = "Apache-2.0"
+version = "0.1.2"
+description = "A python SDK for envoy External Processors, forked from https://github.com/wrossmorrow/envoy-extproc-sdk"
 readme = "README.md"
-repository = "https://github.com/wrossmorrow/envoy-extproc-sdk"
-homepage = "https://github.com/wrossmorrow/envoy-extproc-sdk"
-packages = [
-    { include = "envoy_extproc_sdk" },
+requires-python = ">=3.9,<3.10"
+authors = [{ name = "W. Ross Morrow", email = "morrowwr@gmail.com" }]
+license = { text = "Apache-2.0" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+]
+dependencies = [
+    "grpcio (>=1.71.0,<2.0.0)",
+    "protoc-gen-validate (>=0.4.2,<0.5.0)",
+    "grpclib (>=0.4.2,<0.5.0)",
+    "ddtrace (>=1.20.19,<2.0.0)",
+    "datadog (>=0.44.0,<0.45.0)",
+]
+
+[project.urls]
+Homepage = "https://github.com/Tanantor/envoy-extproc-sdk"
+Repository = "https://github.com/Tanantor/envoy-extproc-sdk"
+
+[tool.uv]
+environments = [
+    "sys_platform == 'darwin'",
+    "sys_platform == 'linux'",
+]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+resolution = "lowest-direct"
+dev-dependencies = [
+    "black (>=22.3.0,<23.0.0)",
+    "flake8 (>=3.9.2,<4.0.0)",
+    "isort (>=5.9.3,<6.0.0)",
+    "mypy (>=0.910,<0.920)",
+    "pytest (>=7.1.2,<8.0.0)",
+    "mypy-protobuf (>=3.2.0,<4.0.0)",
+    "pytest-asyncio (>=0.18.3,<0.19.0)",
+    "coverage (>=6.4.2,<7.0.0)",
+    "requests (>=2.28.1,<3.0.0)",
 ]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.poetry.dependencies]
-python = "^3.9"
-grpcio = "^1.46.1"
-protoc-gen-validate = "^0.4.2"
-grpclib = "^0.4.2"
-ddtrace = "^1.1.*"
-datadog = "^0.44.0"
+[tool.hatch.build.targets.wheel]
+packages = ["envoy_extproc_sdk"]
 
-[tool.poetry.dev-dependencies]
-black = "^22.3.0"
-flake8 = "^3.9.2"
-isort = "^5.9.3"
-mypy = "^0.910"
-pytest = "^7.1.2"
-mypy-protobuf = "^3.2.0"
-pytest-asyncio = "^0.18.3"
-coverage = "^6.4.2"
-requests = "^2.28.1"
+[tool.hatch.build.targets.wheel.shared-data]
+"envoy_extproc_sdk/py.typed" = "envoy_extproc_sdk/py.typed"
 
 [tool.black]
 line-length = 100

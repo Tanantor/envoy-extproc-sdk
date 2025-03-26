@@ -8,12 +8,12 @@ install: python-install codegen
 update: python-update buf-update codegen
 
 python-install:
-    poetry install
+    uv sync
 
 python-update:
-    poetry update
+    uv sync --upgrade
 
-buf-update :
+buf-update:
     buf mod update
 
 codegen:
@@ -26,34 +26,34 @@ codegen:
     bash scripts/install_generated_code.sh
 
 format:
-    poetry run isort envoy_extproc_sdk examples tests
-    poetry run black envoy_extproc_sdk examples tests
-    poetry run flake8 envoy_extproc_sdk examples tests
+    uv run isort envoy_extproc_sdk examples tests
+    uv run black envoy_extproc_sdk examples tests
+    uv run flake8 envoy_extproc_sdk examples tests
 
 types:
-    poetry run mypy envoy_extproc_sdk examples tests
+    uv run mypy envoy_extproc_sdk examples tests
 
 check-format:
-    poetry run isort envoy_extproc_sdk examples tests --check
-    poetry run black envoy_extproc_sdk examples tests --check
-    poetry run flake8 envoy_extproc_sdk examples tests
+    uv run isort envoy_extproc_sdk examples tests --check
+    uv run black envoy_extproc_sdk examples tests --check
+    uv run flake8 envoy_extproc_sdk examples tests
 
 unit-test: 
     DD_TRACE_ENABLED=false \
-        poetry run python -m pytest -v tests/unit
+        uv run python -m pytest -v tests/unit
 
 integration-test: 
     DD_TRACE_ENABLED=false \
-        poetry run python -m pytest tests/integration
+        uv run python -m pytest tests/integration
 
 coverage: 
     DD_TRACE_ENABLED=false \
-        poetry run coverage run -m pytest -v tests/unit \
+        uv run coverage run -m pytest -v tests/unit \
             --junitxml=test-results/junit.xml
-    poetry run coverage report -m
+    uv run coverage report -m
 
 run service="envoy_extproc_sdk.BaseExtProcService":
-    poetry run python -m envoy_extproc_sdk --service {{service}} --logging
+    uv run python -m envoy_extproc_sdk --service {{service}} --logging
 
 build:
     docker build . -t {{image_name}}:{{image_tag}}
@@ -62,13 +62,13 @@ build:
         -t {{image_name}}-examples:{{image_tag}}
 
 up:
-    docker-compose up --build
+    docker compose up --build
 
 down:
-    docker-compose down --volumes
+    docker compose down --volumes
 
 package:
-    poetry build
+    uv pip build
 
 publish:
-    poetry publish -r pypi --build
+    uv pip publish --build
