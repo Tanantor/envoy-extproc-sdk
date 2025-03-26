@@ -24,22 +24,11 @@ static_resources:
                             envoy.filters.http.ext_proc:
                               '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
                               disabled: true
-                        # - match:
-                        #     prefix: "/body-modify"
-                        #   route:
-                        #     cluster: upstream
-                        #   typed_per_filter_config:
-                        #     envoy.filters.http.ext_proc:
-                        #       '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
-                        #       config:
-                        #         grpc_service:
-                        #           envoy_grpc:
-                        #             cluster_name: body_modify
-                        #         processing_mode:
-                        #           request_header_mode: SEND
-                        #           response_header_mode: SEND
-                        #           request_body_mode: BUFFERED
-                        #           response_body_mode: BUFFERED
+                        - match:
+                            prefix: "/completions"
+                          route:
+                            cluster: streaming
+                            timeout: 60s  # Longer timeout for streaming
                         - match:
                             prefix: "/"
                           route:
@@ -163,9 +152,9 @@ static_resources:
                       grpc_service: 
                         envoy_grpc:
                           cluster_name: llm_proxy
-                        timeout: 30s
+                        timeout: 60s
                       failure_mode_allow: true
-                      message_timeout: 0.2s
+                      message_timeout: 1s
                       processing_mode: 
                         request_header_mode: SEND
                         response_header_mode: SEND
@@ -215,6 +204,27 @@ static_resources:
                 address:
                   socket_address:
                     address: upstream
+                    port_value: 80
+                    
+  - name: streaming
+    connect_timeout: 0.250s
+    type: LOGICAL_DNS
+    lb_policy: LEAST_REQUEST
+    dns_lookup_family: V4_ONLY
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http_protocol_options: {}
+    load_assignment:
+      cluster_name: streaming
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                hostname: streaming
+                address:
+                  socket_address:
+                    address: streaming
                     port_value: 80
   - name: trivial
     dns_lookup_family: V4_ONLY

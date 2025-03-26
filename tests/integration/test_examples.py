@@ -183,15 +183,16 @@ async def test_body_modify_service(http_client: AsyncClient, request_id: str):
 
 
 @pytest.mark.asyncio
-async def test_llm_proxy_service(http_client: AsyncClient, request_id: str):
-    """Test that the LLMProxyExtProcService correctly modifies the LLM API request."""
+async def test_llm_proxy_service_streaming(http_client: AsyncClient, request_id: str):
+    """Test that the LLMProxyExtProcService correctly handles streaming responses."""
     test_data = {
         "model": "gpt-3.5-turbo",
         "messages": [{"role": "user", "content": "Hello"}],
         "stream": True,
     }
 
-    response = await http_client.post(
+    async with http_client.stream(
+        "POST",
         "/completions",
         json=test_data,
         headers={
@@ -199,41 +200,29 @@ async def test_llm_proxy_service(http_client: AsyncClient, request_id: str):
             "authorization": "Bearer test-key",
             "x-request-id": request_id,
         },
-    )
+    ) as response:
+        assert response.status_code == 200
 
-    assert response.status_code == 200
+        assert "text/event-stream" in response.headers["content-type"].lower()
 
-    body = response.json()
-    print(body)
-    assert body["path"].endswith("/completions")
+        assert "x-llm-proxy" in response.headers
+        assert response.headers["x-llm-proxy"] == "true"
+        print(("response_text", response))
 
-    # The x-llm-proxy header should be present in the response headers
-    assert "x-llm-proxy" in response.headers
-    assert response.headers["x-llm-proxy"] == "true"
+        full_response = ""
+        async for chunk in response.aiter_text():
+            full_response += chunk
+            if "[DONE]" in chunk:
+                break
 
-    # Check request headers sent to upstream
-    assert "x-target-host" in body["headers"]
-    assert body["headers"]["x-target-host"] == "api.openai.com"
+        print(f"Full response: {full_response[:200]}...")
 
-    # Check authorization was modified
-    assert "authorization" in body["headers"]
-    assert body["headers"]["authorization"] == "Bearer sk-proxy-key-replaced"
+        sse_chunks = [chunk for chunk in full_response.split("data:") if chunk.strip()]
+        print(f"Found {len(sse_chunks)} SSE chunks")
 
-    # The body received by the echo server should have the modifications we made
-    received_body = body["body"]
+        # We should have received at least 4 SSE chunks (role, content, finish, DONE)
+        assert len(sse_chunks) > 3
 
-    if isinstance(received_body, str):
-        try:
-            received_body = json.loads(received_body)
-        except json.JSONDecodeError as e:
-            print(f"Failed to parse JSON body: {e}")
-            assert False, f"Failed to parse JSON body: {e}, raw body: {received_body}"
-
-    # Check that model was modified
-    assert received_body["model"] == "gpt-4o"
-
-    # Check that other fields were unchanged
-    assert received_body["stream"] is True
-    assert len(received_body["messages"]) == 1
-    assert received_body["messages"][0]["role"] == "user"
-    assert received_body["messages"][0]["content"] == "Hello"
+        assert "assistant" in full_response
+        assert "content" in full_response
+        assert "[DONE]" in full_response

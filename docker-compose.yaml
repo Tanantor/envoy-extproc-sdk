@@ -21,6 +21,15 @@ services:
       - "8000:80"
     environment:
       - LOG_LEVEL=info
+      
+  streaming:
+    hostname: streaming
+    image: streaming-server:${IMAGE_TAG:-compose}
+    build:
+      context: tests/mocks/streaming
+      dockerfile: "Dockerfile"
+    ports:
+      - "8001:80"
 
   base:
     image: envoy-extproc-sdk:${IMAGE_TAG:-compose}
