@@ -19,7 +19,7 @@ python-update:
 
 .PHONY: buf-update 
 buf-update:
-	buf mod update
+	buf dep update
 
 .PHONY: codegen
 codegen:
