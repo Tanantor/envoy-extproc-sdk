@@ -75,8 +75,12 @@ build:
 		--build-arg IMAGE_TAG=$(IMAGE_TAG) \
 		-t $(IMAGE_NAME)-examples:$(IMAGE_TAG)
 
+.PHONY: build-base
+build-base:
+	docker compose build base
+
 .PHONY: up
-up:
+up: build-base
 	docker compose up --build
 
 .PHONY: down
