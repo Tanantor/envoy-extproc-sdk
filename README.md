@@ -10,7 +10,7 @@ Forked from [wrossmorrow/envoy-extproc-sdk](https://github.com/wrossmorrow/envoy
 ### Usage
 
 Specifically we supply a `BaseExtProcService` that provides much of the boilerplate required to make this type of service. Here is a brief, untyped example of how to build one (based on `examples/decorated.py`):
-```
+```py
 import logging
 from envoy_extproc_sdk import BaseExtProcService, serve
 
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     serve(service=svc)
 ```
 In short, you can simply "decorate" methods (of the right signature) and form an ExternalProcessor. This "route decoration" is a pattern common to `python` server frameworks, and is probably the easiest way to get started. The primary pattern we use though is subclassing, as you'll see if you review `examples/*.py`. 
-```
+```py
 class SomeExtProcService(BaseExtProcService):
 
     def process_request_headers(self, headers, context, request, response):
@@ -64,17 +64,17 @@ Storing and managing that inter-phase data is what `request` is for; see `exampl
 ### Distribution
 
 We distribute this as `python` [package on pypi](https://pypi.org/project/envoy-extproc-sdk/#description)
-```
+```sh
 $ uv pip install envoy-extproc-sdk
 ```
 and as a `docker` container on [dockerhub](https://hub.docker.com/r/wrossmorrow/envoy-extproc-sdk-python)
-```
+```sh
 $ docker pull envoy-extproc-sdk-python:latest
 ```
 Note we do _not_ package generated code from `envoy`'s `protobuf` specs in the `python` module. (The `grpc` libraries themselves are "broken" relative to newer `protobuf` because they embedd old generated code for health checks, which seem now unusable.) So if you use the `python` package you have to build and install the `protobuf` generated code from `envoy` (see `buf.yaml` here and `make codegen`) for it to work. We recommend following our approach here, as we customize handling of the health check generated code. 
 
 You can build on top of the `envoy_extproc_sdk` `docker` image and avoid this, as we _do_ package the generated code in images. This can be done in the normal way, actually as illustrated by the examples here. In fact, `examples/Dockerfile` (used in the `docker compose.yaml`) is only
-```
+```dockerfile
 # syntax=docker/dockerfile:1.2
 ARG IMAGE_TAG=latest
 FROM envoy-extproc-sdk:${IMAGE_TAG}
@@ -90,7 +90,7 @@ There are some testing utilities in `envoy_extproc_sdk.testing`. These mainly he
 * `envoy_body`: return a [HttpBody](https://github.com/envoyproxy/envoy/blob/1cf5603dc5239c92e5bc38ef321f59ccf6eabc6e/api/envoy/service/ext_proc/v3/external_processor.proto#L199) object from several types that could be bodies
 * `envoy_set_headers_to_dict`: return a `dict` of headers from a [CommonResponse](https://github.com/envoyproxy/envoy/blob/1cf5603dc5239c92e5bc38ef321f59ccf6eabc6e/api/envoy/service/ext_proc/v3/external_processor.proto#L230) object (useful for response modification assertions)
 * `AsEnvoyExtProc` is a class that can be initialized with phase data and sent to `BaseExtProcService.Process` to mimic processing of a request; ie
-```
+```py
 P = BaseExtProcService()
 E = AsEnvoyExtProc(request_headers=headers, request_body=body)
 async for response in P.Process(E, None):
@@ -104,22 +104,22 @@ The project includes integration tests to validate the example services through 
 To run the integration tests:
 
 1. Start the Docker Compose services in detached mode:
-   ```
-   make up-test
-   ```
+```sh
+make up-test
+```
 
 2. Run the integration tests:
-   ```
-   make integration-test-local
-   ```
+```sh
+make integration-test
+```
 
 3. Clean up the Docker Compose services:
-   ```
-   make down-test
-   ```
+```sh
+make down-test
+```
 
 Or run all tests (unit and integration) with a single command:
-```
+```sh
 make test
 ```
 
@@ -128,7 +128,7 @@ make test
 Of course, this service isn't useful outside an `envoy` deployment configured to use it. This SDK doesn't help you configure your `envoy`, but see `envoy.yaml` for example configurations and see [the configuration reference](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto). 
 
 A simple version is something like
-```
+```yaml
 - name: envoy.filters.http.ext_proc
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
@@ -159,7 +159,7 @@ The key features to point out are:
 ### Command Line Interface
 
 You can run the package as module and invoke a CLI: 
-```
+```sh
 $ python -m envoy_extproc_sdk --help
 usage: __main__.py [-h] [-s SERVICE] [-p PORT] [-g GRACE_PERIOD] [-l]
 
@@ -314,11 +314,11 @@ Trailers handlers are similar, but less likely to be used. See the code for deta
 There are several examples in `examples/`. These can be packaged in the `docker` image built from `examples/Dockerfile` (see `make build`) and included as services in the `docker compose.yaml`. The basic `envoy` config `envoy.yaml` (used by the `docker compose`) sets each example up to be used. 
 
 `envoy_extproc_sdk.BaseExtProcService`: The `BaseExtProcService` is an example in it's own right, but does nothing to requests. Using `LOG_LEVEL=DEBUG` will print log lines describing the processing steps taken. Run with
-```
+```sh
 LOG_LEVEL=DEBUG make run
 ```
 For any other examples you can use the same command to run, specifying the `SERVICE`. For example, 
-```
+```sh
 make run SERVICE=examples.TrivialExtProcService
 ```
 will run our first example, the "trivial" processor. 
@@ -337,7 +337,7 @@ will run our first example, the "trivial" processor.
 
 * `examples.LLMProxyExtProcService`: This example demonstrates how to proxy requests to an LLM API by modifying request parameters and headers. It specifically handles streaming responses from LLM providers and shows how to implement an API proxy for model providers like OpenAI. To test this service with curl:
 
-```bash
+```sh
 curl -v "http://localhost:8080/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer test-key" \
@@ -361,7 +361,7 @@ curl -v "http://localhost:8080/v1/chat/completions" \
 #### CLI/`make`
 
 The `Makefile` provides a lot of helpful targets to get started. The simplest quickstart is probably
-```
+```sh
 $ make install format unit-test run
 ```
 This will (a) install the `python` dependencies, (b) use `buf` to generate code (and install it in the current virtual environment), (c) format the code, (d) run the unit tests, (e) and run the `BaseExtProcService`. However, running the service on it's own is only partially useful as the service is a gRPC service which isn't the easiest to just `curl` at. 
@@ -383,11 +383,11 @@ The `docker compose` is a setup with `envoy`, a naive "echo" HTTP server (see `t
 * `message`: a message from the `echo` server
 
 For example, after running 
-```
+```sh
 $ make up
 ```
 you can try 
-```
+```sh
 $ curl localhost:8080/something -D -
 HTTP/1.1 200 OK
 server: envoy
@@ -399,11 +399,12 @@ x-request-started: 2022-07-16T22:55:19.290822Z
 x-duration-ns: 23589000
 x-ext-procs-applied: TrivialExtProcService,TimerExtProcService,EchoExtProcService,DigestExtProcService,DecoratedExtProcService,CtxExtProcService
 x-extra-request-id: 554c54e8-fac1-42e3-8ab8-1f2264f59664
-
+```
+```json
 {"method": "get", "path": "/something", "headers": {"host": "localhost:8080", "user-agent": "curl/7.64.1", "accept": "*/*", "x-forwarded-proto": "http", "x-request-id": "554c54e8-fac1-42e3-8ab8-1f2264f59664", "x-extra-request-id": "554c54e8-fac1-42e3-8ab8-1f2264f59664", "x-request-started": "2022-07-16T22:55:19.290822Z", "x-request-digest": "860d64d6465b9e9886050295087e8a547b3e7a3c40e79d26147b50a97b9ac2c6", "x-context-id": "", "x-envoy-expected-rq-timeout-ms": "15000"}, "body": "{\"hello\":\"hi\"}", "message": "Hello"}
 ```
 or 
-```
+```sh
 $ curl localhost:8080/something -X PUT -H 'Content-type: application/json' -d '{"hello":"hi"}' -D -
 HTTP/1.1 200 OK
 server: envoy
@@ -416,12 +417,13 @@ x-request-started: 2022-07-16T22:54:49.660908Z
 x-duration-ns: 25046000
 x-ext-procs-applied: TrivialExtProcService,TimerExtProcService,EchoExtProcService,DigestExtProcService,DecoratedExtProcService,CtxExtProcService
 x-extra-request-id: 7a983b59-d67c-44c8-a54a-2afae7069ac9
-
+```
+```json
 {"method": "put", "path": "/something", "headers": {"host": "localhost:8080", "user-agent": "curl/7.64.1", "accept": "*/*", "content-type": "application/json", "content-length": "14", "x-forwarded-proto": "http", "x-request-id": "7a983b59-d67c-44c8-a54a-2afae7069ac9", "x-extra-request-id": "7a983b59-d67c-44c8-a54a-2afae7069ac9", "x-request-started": "2022-07-16T22:54:49.660908Z", "x-request-digest": "a794dbc467285567e4c2604c991938386366f6ab94b0b0e4fab5e27e0a932e60", "x-context-id": "", "x-envoy-expected-rq-timeout-ms": "15000"}, "body": "{\"hello\":\"hi\"}", "message": "Hello"}
 ```
 
 For contrast, here are these two requests _without_ filters: 
-```
+```sh
 $ curl localhost:8080/something -X PUT -H 'Content-type: application/json' -d '{"hello":"hi"}' -D -
 HTTP/1.1 200 OK
 server: envoy
@@ -429,9 +431,11 @@ date: Sat, 16 Jul 2022 23:40:24 GMT
 content-length: 362
 content-type: application/json
 x-envoy-upstream-service-time: 1
-
-{"method": "put", "path": "/something", "headers": {"host": "localhost:8080", "user-agent": "curl/7.64.1", "accept": "*/*", "content-type": "application/json", "content-length": "14", "x-forwarded-proto": "http", "x-request-id": "0afcd2c4-6d3d-4513-a29b-40c7954f8942", "x-envoy-expected-rq-timeout-ms": "15000"}, "body": "{\"hello\":\"hi\"
-
+```
+```json
+{"method": "put", "path": "/something", "headers": {"host": "localhost:8080", "user-agent": "curl/7.64.1", "accept": "*/*", "content-type": "application/json", "content-length": "14", "x-forwarded-proto": "http", "x-request-id": "0afcd2c4-6d3d-4513-a29b-40c7954f8942", "x-envoy-expected-rq-timeout-ms": "15000"}, "body": "", "message": "Hello"}
+```
+```sh
 $ curl localhost:8080/something -D -
 HTTP/1.1 200 OK
 server: envoy
@@ -439,7 +443,8 @@ date: Sat, 16 Jul 2022 23:40:30 GMT
 content-length: 302
 content-type: application/json
 x-envoy-upstream-service-time: 1
-
+```
+```json
 {"method": "get", "path": "/something", "headers": {"host": "localhost:8080", "user-agent": "curl/7.64.1", "accept": "*/*", "x-forwarded-proto": "http", "x-request-id": "f8dfa254-157b-4f75-a7d0-121f3d245d6b", "x-envoy-expected-rq-timeout-ms": "15000"}, "body": "{\"hello\":\"hi\"}", "message": "Hello"}
 ```
 Note the additional response headers and the extra information about the upstream services request headers in the response body. That's the filter set working! 
