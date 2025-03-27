@@ -180,8 +180,8 @@ async def test_context_service(http_client: AsyncClient, request_id: str):
 @pytest.mark.parametrize(
     "model,expected_route,expected_provider_model",
     [
-        ("gpt-3.5-turbo", "openai", "gpt-4o"),
-        ("claude-3.5-sonnet", "anthropic", "claude-3.7-sonnet"),
+        ("gpt-3.5-turbo", "openai:80", "gpt-4o"),
+        ("claude-3.5-sonnet", "anthropic:80", "claude-3.7-sonnet"),
     ],
 )
 async def test_llm_proxy_service_streaming(
@@ -198,9 +198,10 @@ async def test_llm_proxy_service_streaming(
         "stream": True,
     }
 
+    # Test the dynamic forward proxy routing
     async with http_client.stream(
         "POST",
-        "/completions",
+        "/v1/chat/completions",
         json=test_data,
         headers={
             "content-type": "application/json",
@@ -219,9 +220,14 @@ async def test_llm_proxy_service_streaming(
         assert "x-original-model" in response.headers
         assert response.headers["x-original-model"] == model
 
-        # # Check routing header was set
+        # Check routing header was set
         assert "x-route-to" in response.headers
         assert response.headers["x-route-to"] == expected_route
+
+        # For Anthropic, we should see path rewriting
+        if "anthropic" in expected_route:
+            assert "x-path-rewritten" in response.headers
+            assert response.headers["x-path-rewritten"] == "true"
 
         full_response = ""
         async for chunk in response.aiter_text():
@@ -243,4 +249,5 @@ async def test_llm_proxy_service_streaming(
 
         # Verify the model was changed in the response chunks
         assert f'"model": "{expected_provider_model}"' in full_response
-        assert f'"provider": "{expected_route}"' in full_response
+        expected_provider = expected_route.split(":")[0]
+        assert f'"provider": "{expected_provider}"' in full_response

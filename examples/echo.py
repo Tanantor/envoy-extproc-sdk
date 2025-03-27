@@ -58,7 +58,7 @@ class EchoExtProcService(BaseExtProcService):
 
         headers = request["request_headers"].copy()
         headers["content-type"] = "application/json"
-        
+
         immediate_response = self.form_immediate_response(
             EnvoyHttpStatusCode.OK, headers, json.dumps(response_body)
         )

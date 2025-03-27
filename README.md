@@ -338,7 +338,7 @@ will run our first example, the "trivial" processor.
 * `examples.LLMProxyExtProcService`: This example demonstrates how to proxy requests to an LLM API by modifying request parameters and headers. It specifically handles streaming responses from LLM providers and shows how to implement an API proxy for model providers like OpenAI. To test this service with curl:
 
 ```bash
-curl -v "http://localhost:8080/completions" \
+curl -v "http://localhost:8080/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer test-key" \
   -d '{"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": "Hello"}], "stream": true}'

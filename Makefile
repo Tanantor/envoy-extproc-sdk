@@ -99,13 +99,8 @@ up-test: build-base
 down-test:
 	docker compose down --volumes
 
-.PHONY: integration-test-local
-integration-test-local: 
-	DD_TRACE_ENABLED=false \
-		uv run pytest -v tests/integration
-
 .PHONY: test
-test: unit-test integration-test down-test
+test: unit-test down-test integration-test down-test
 
 .PHONY: test-flake-finder
 test-flake-finder:
