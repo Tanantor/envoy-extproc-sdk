@@ -8,7 +8,7 @@ import pytest_asyncio
 @pytest_asyncio.fixture
 async def http_client() -> AsyncGenerator[AsyncClient, None]:
     """Fixture for async HTTP client to test the Envoy ExtProc services through Envoy proxy."""
-    async with AsyncClient(base_url="http://localhost:8080", timeout=30.0) as client:
+    async with AsyncClient(base_url="http://localhost:8080", timeout=10.0) as client:
         yield client
 
 

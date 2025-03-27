@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from asyncio import CancelledError, iscoroutinefunction
 from enum import Enum
-from logging import getLogger
+from logging import getLogger, Logger
 from typing import (
     AsyncGenerator,
     AsyncIterator,
@@ -84,8 +84,9 @@ class BaseExtProcService(EnvoyExtProcServicer):
         "content-length": "content_length",
     }
 
-    def __init__(self, name: Optional[str] = None) -> None:
+    def __init__(self, name: Optional[str] = None, logger: Optional[Logger] = None ) -> None:
         self.name = name or self.__class__.__name__
+        self.logger = logger or getLogger(__name__)
 
     def __repr__(self) -> str:
         """Get this object's \"name\", either class name or overriden"""

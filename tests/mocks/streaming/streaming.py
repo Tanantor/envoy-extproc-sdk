@@ -76,10 +76,8 @@ class StreamingHandler(http.server.BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             request_data = {}
 
-        path_is_completions = self.path.startswith("/completions")
-        is_streaming = (
-            path_is_completions  # Force streaming for all completions requests for this example
-        )
+        # Force streaming for all requests for this example
+        is_streaming = True
 
         logger.debug(f"Received request: path={self.path}")
         logger.debug(f"RECEIVED BODY: {body}")
