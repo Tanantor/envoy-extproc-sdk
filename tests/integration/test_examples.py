@@ -223,7 +223,7 @@ async def test_llm_proxy_service_streaming(
         # Check routing header was set
         assert "x-route-to" in response.headers
         assert response.headers["x-route-to"] == expected_route
-        
+
         # For Anthropic, we should see path rewriting
         if "anthropic" in expected_route:
             assert "x-path-rewritten" in response.headers

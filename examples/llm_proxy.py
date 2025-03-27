@@ -15,7 +15,6 @@ from typing import Any, Dict
 from envoy_extproc_sdk import BaseExtProcService, ext_api, serve
 from grpc import ServicerContext
 
-
 LLM_PROXY_HEADER = "x-llm-proxy"
 TARGET_ENDPOINT = "/v1"
 TARGET_MODEL_HEADER = "x-target-model"
@@ -91,10 +90,7 @@ class LLMProxyExtProcService(BaseExtProcService):
         if not original_path.startswith(TARGET_ENDPOINT):
             return response
 
-        if (
-            request.get("content_type")
-            and "application/json" in request["content_type"]
-        ):
+        if request.get("content_type") and "application/json" in request["content_type"]:
             try:
                 body_str = body.body.decode("utf-8")
                 self.logger.debug(f"ORIGINAL BODY: {body_str}")
@@ -110,9 +106,7 @@ class LLMProxyExtProcService(BaseExtProcService):
 
                     # Set routing headers based on the model
                     self.add_header(response, TARGET_MODEL_HEADER, original_model)
-                    model_mapping = MODEL_MAPPINGS.get(
-                        original_model, MODEL_MAPPINGS["default"]
-                    )
+                    model_mapping = MODEL_MAPPINGS.get(original_model, MODEL_MAPPINGS["default"])
                     target_route = model_mapping.get("inference_provider_url", "")
                     self.add_header(response, ROUTE_HEADER, target_route)
 
@@ -128,9 +122,7 @@ class LLMProxyExtProcService(BaseExtProcService):
                     response.clear_route_cache = True
 
                     # Modify model parameter based on target route
-                    json_body["model"] = model_mapping.get(
-                        "inference_provider_model", ""
-                    )
+                    json_body["model"] = model_mapping.get("inference_provider_model", "")
 
                     modified = True
                     self.logger.info(
@@ -138,9 +130,7 @@ class LLMProxyExtProcService(BaseExtProcService):
                     )
 
                     # Check if we need to rewrite the path
-                    path_rewrites = PATH_REWRITES.get(
-                        model_mapping["inference_provider_id"], {}
-                    )
+                    path_rewrites = PATH_REWRITES.get(model_mapping["inference_provider_id"], {})
                     for old_path, new_path in path_rewrites.items():
                         if old_path in original_path:
                             new_request_path = original_path.replace(old_path, new_path)
@@ -200,9 +190,7 @@ class LLMProxyExtProcService(BaseExtProcService):
         # Check if this is a streaming response (for demo/debug purposes)
         content_type = self.get_header(headers, "content-type")
         if content_type and "text/event-stream" in content_type.lower():
-            self.logger.debug(
-                "Detected streaming response with content-type: %s", content_type
-            )
+            self.logger.debug("Detected streaming response with content-type: %s", content_type)
         return response
 
 
