@@ -335,14 +335,7 @@ will run our first example, the "trivial" processor.
 
 * `examples.BodyModifyExtProcService`: This example demonstrates how to modify the JSON request body before forwarding to the upstream service. It renames a key, modifies a value, and adds headers to indicate the body was modified.
 
-* `examples.LLMProxyExtProcService`: This example demonstrates how to proxy requests to an LLM API by modifying request parameters and headers. It specifically handles streaming responses from LLM providers and shows how to implement an API proxy for model providers like OpenAI. To test this service with curl:
-
-```sh
-curl -v "http://localhost:8080/v1/chat/completions" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer test-key" \
-  -d '{"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": "Hello"}], "stream": true}'
-```
+* `examples.LLMProxyExtProcService`: This example demonstrates how to proxy requests to an LLM API by modifying request parameters and headers. It specifically handles streaming responses from LLM providers and shows how to implement an API proxy for model inference providers like OpenAI.
 
 * `CtxExtProcService`: This example allows for testing the request context. It reads a request header `x-context-id`, adding that to the upstream request headers. If that header is missing, the service does nothing else. If it exists, it will also analyze the request body, which it expects to be exactly the `x-context-id` supplied. The processor will fail if this doesn't match. The filter also processes the response body, which it expects to be JSON with the request path equal to `path` (as with our echo server in `tests/mocks/echo`). The service checks that value matches the `path` stored in the request context. These steps are largely to check that we can _concurrently_ make requests with different values and see consistency in the response header `x-context-id`, which we will not get if the service's processing fails. 
 
@@ -389,6 +382,8 @@ $ make up
 you can try 
 ```sh
 $ curl localhost:8080/something -D -
+```
+```text
 HTTP/1.1 200 OK
 server: envoy
 date: Sat, 16 Jul 2022 22:55:19 GMT
@@ -406,6 +401,8 @@ x-extra-request-id: 554c54e8-fac1-42e3-8ab8-1f2264f59664
 or 
 ```sh
 $ curl localhost:8080/something -X PUT -H 'Content-type: application/json' -d '{"hello":"hi"}' -D -
+```
+```text
 HTTP/1.1 200 OK
 server: envoy
 date: Sat, 16 Jul 2022 22:54:49 GMT
@@ -425,6 +422,8 @@ x-extra-request-id: 7a983b59-d67c-44c8-a54a-2afae7069ac9
 For contrast, here are these two requests _without_ filters: 
 ```sh
 $ curl localhost:8080/something -X PUT -H 'Content-type: application/json' -d '{"hello":"hi"}' -D -
+```
+```text
 HTTP/1.1 200 OK
 server: envoy
 date: Sat, 16 Jul 2022 23:40:24 GMT
@@ -437,6 +436,8 @@ x-envoy-upstream-service-time: 1
 ```
 ```sh
 $ curl localhost:8080/something -D -
+```
+```text
 HTTP/1.1 200 OK
 server: envoy
 date: Sat, 16 Jul 2022 23:40:30 GMT
@@ -444,7 +445,51 @@ content-length: 302
 content-type: application/json
 x-envoy-upstream-service-time: 1
 ```
+Note the additional response headers and the extra information about the upstream services request headers in the response body. That's the filter set working! 
 ```json
 {"method": "get", "path": "/something", "headers": {"host": "localhost:8080", "user-agent": "curl/7.64.1", "accept": "*/*", "x-forwarded-proto": "http", "x-request-id": "f8dfa254-157b-4f75-a7d0-121f3d245d6b", "x-envoy-expected-rq-timeout-ms": "15000"}, "body": "{\"hello\":\"hi\"}", "message": "Hello"}
 ```
-Note the additional response headers and the extra information about the upstream services request headers in the response body. That's the filter set working! 
+
+For testing the LLM proxy example:
+```sh
+$ curl -v "http://localhost:8080/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer test-key" \
+  -d '{"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": "Hello"}], "stream": true}'
+```
+```text
+< HTTP/1.1 200 OK
+< server: envoy
+< date: Thu, 27 Mar 2025 20:40:52 GMT
+< content-type: text/event-stream
+< x-forwarded-for: 192.168.65.1
+< x-forwarded-proto: http
+< x-envoy-internal: true
+< x-request-id: e23096e2-0762-4de6-9e6b-8c47872579b3
+< x-context-id: 
+< x-target-model: gpt-3.5-turbo
+< x-content-length: 87
+< x-envoy-expected-rq-timeout-ms: 60000
+< x-envoy-upstream-service-time: 0
+< x-llm-proxy: true
+< x-original-model: gpt-3.5-turbo
+< x-route-to: openai:80
+< x-request-digest: 7619fb38d7531fd3f55b3971f6e04bfcbfac8f8a8c8f8f760fbbd3712f62e5da
+< x-request-started: 2025-03-27T20:40:52.681284Z
+< x-duration-ns: 434543000
+< x-ext-procs-applied: TrivialExtProcService,TimerExtProcService,BodyModifyExtProcService,EchoExtProcService,DigestExtProcService,DecoratedExtProcService,CtxExtProcService,LLMProxyExtProcService
+< x-extra-request-id: e23096e2-0762-4de6-9e6b-8c47872579b3
+< transfer-encoding: chunked
+
+data: {"id": "chatcmpl-123", "object": "chat.completion.chunk", "model": "gpt-4o", "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": null}]}
+
+data: {"id": "chatcmpl-123", "object": "chat.completion.chunk", "model": "gpt-4o", "provider": "openai", "choices": [{"index": 0, "delta": {"content": "part 1 Response from openai provider. "}, "finish_reason": null}]}
+
+data: {"id": "chatcmpl-123", "object": "chat.completion.chunk", "model": "gpt-4o", "provider": "openai", "choices": [{"index": 0, "delta": {"content": "part 2 "}, "finish_reason": null}]}
+
+data: {"id": "chatcmpl-123", "object": "chat.completion.chunk", "model": "gpt-4o", "provider": "openai", "choices": [{"index": 0, "delta": {"content": "part 3 "}, "finish_reason": null}]}
+
+data: {"id": "chatcmpl-123", "object": "chat.completion.chunk", "model": "gpt-4o", "choices": [{"index": 0, "delta": {"content": "completed"}, "finish_reason": "stop"}]}
+
+data: [DONE]
+```
