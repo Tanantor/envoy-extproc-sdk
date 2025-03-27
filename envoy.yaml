@@ -235,14 +235,12 @@ static_resources:
                   use_tcp_for_dns_lookups: true
                   no_default_search_domain: true
       # This cluster would include a config.core.v3.TransportSocket for TLS
-      # https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-transportsocket
+      # https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/tls.proto
       # transport_socket:
       #   name: envoy.transport_sockets.tls
       #   typed_config:
       #     "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-      #     common_tls_context:
-      #       validation_context:
-      #         trusted_ca: {filename: /etc/ssl/certs/ca-certificates.crt}
+      #     auto_host_sni: true
 
     - name: listener
       connect_timeout: 0.250s
